@@ -7,7 +7,6 @@
 #include "freertos/task.h"
 #include <string.h>
 
-static const char *TAG = "dogtag_audio";
 
 extern const uint8_t dogtag_help_wav_start[] asm("_binary_dogtag_help_wav_start");
 extern const uint8_t dogtag_help_wav_end[]   asm("_binary_dogtag_help_wav_end");

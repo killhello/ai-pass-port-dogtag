@@ -9,7 +9,6 @@
 extern const lv_font_t font_cn_16;
 extern const lv_font_t font_cn_20;
 
-static const char *TAG = "dogtag_ui";
 
 static lv_obj_t *s_scr;
 static lv_obj_t *s_panel;

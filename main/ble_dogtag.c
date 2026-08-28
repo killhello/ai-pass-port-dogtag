@@ -67,12 +67,13 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
     (void)arg; (void)conn; (void)attr;
     const ble_uuid_t *uuid = ctx->chr->uuid;
 
+    ble_uuid128_t *uuid128 = BLE_UUID128(uuid);
     ESP_LOGD(TAG, "gatt_access op=%d uuid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
              ctx->op,
-             uuid->value.u128[15], uuid->value.u128[14], uuid->value.u128[13], uuid->value.u128[12],
-             uuid->value.u128[11], uuid->value.u128[10], uuid->value.u128[9], uuid->value.u128[8],
-             uuid->value.u128[7], uuid->value.u128[6], uuid->value.u128[5], uuid->value.u128[4],
-             uuid->value.u128[3], uuid->value.u128[2], uuid->value.u128[1], uuid->value.u128[0]);
+             uuid128->value[15], uuid128->value[14], uuid128->value[13], uuid128->value[12],
+             uuid128->value[11], uuid128->value[10], uuid128->value[9], uuid128->value[8],
+             uuid128->value[7], uuid128->value[6], uuid128->value[5], uuid128->value[4],
+             uuid128->value[3], uuid128->value[2], uuid128->value[1], uuid128->value[0]);
 
     if (ctx->op == BLE_GATT_ACCESS_OP_READ_CHR) {
         if (ble_uuid_cmp(uuid, &chr_name_uuid.u) == 0) {
