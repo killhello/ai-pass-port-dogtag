@@ -9,7 +9,6 @@
 #include "esp_http_server.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
-#include "lwip/apps/dhcpserver.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
