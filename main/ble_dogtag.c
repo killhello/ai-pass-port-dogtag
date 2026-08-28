@@ -69,10 +69,10 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
 
     ESP_LOGD(TAG, "gatt_access op=%d uuid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
              ctx->op,
-             uuid->value.uuid128[15], uuid->value.uuid128[14], uuid->value.uuid128[13], uuid->value.uuid128[12],
-             uuid->value.uuid128[11], uuid->value.uuid128[10], uuid->value.uuid128[9], uuid->value.uuid128[8],
-             uuid->value.uuid128[7], uuid->value.uuid128[6], uuid->value.uuid128[5], uuid->value.uuid128[4],
-             uuid->value.uuid128[3], uuid->value.uuid128[2], uuid->value.uuid128[1], uuid->value.uuid128[0]);
+             uuid->u128.value[15], uuid->u128.value[14], uuid->u128.value[13], uuid->u128.value[12],
+             uuid->u128.value[11], uuid->u128.value[10], uuid->u128.value[9], uuid->u128.value[8],
+             uuid->u128.value[7], uuid->u128.value[6], uuid->u128.value[5], uuid->u128.value[4],
+             uuid->u128.value[3], uuid->u128.value[2], uuid->u128.value[1], uuid->u128.value[0]);
 
     if (ctx->op == BLE_GATT_ACCESS_OP_READ_CHR) {
         if (ble_uuid_cmp(uuid, &chr_name_uuid.u) == 0) {

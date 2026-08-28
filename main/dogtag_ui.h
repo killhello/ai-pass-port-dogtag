@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lvgl.h"
 #include "dogtag_state.h"
 
 #ifdef __cplusplus

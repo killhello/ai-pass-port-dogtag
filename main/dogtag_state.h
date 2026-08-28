@@ -26,6 +26,8 @@ void dogtag_state_load_nvs(void);
 void dogtag_state_start_debounce_timer(void);
 void dogtag_state_stop_all_timers(void);
 
+int dogtag_state_get_countdown(void);
+
 #ifdef __cplusplus
 }
 #endif
