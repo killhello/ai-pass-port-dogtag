@@ -237,7 +237,7 @@ static void enter_pairing_screen(void) {
     lv_obj_set_style_text_align(s_lbl_sos, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_INK), 0);
     lv_obj_center(s_lbl_sos);
-    lv_label_set_text(s_lbl_sos, "\n\n黑狗牌走失\n\n" "BLE 设置主人信息");
+    lv_label_set_text(s_lbl_sos, "\n\n配对模式\n\n请扫描蓝牙\n设置主人信息");
     s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
