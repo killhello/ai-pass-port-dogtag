@@ -10,6 +10,8 @@ idf_component_register(
          "demo_wifi.c"
          "demo_ble.c"
          "demo_low_power.c"
+         "demo_dogtag.c"
     INCLUDE_DIRS "."
+    EMBED_FILES "dogtag_help.wav"
     REQUIRES bsp bt esp_event esp_hw_support esp_netif esp_timer esp_wifi nvs_flash
 )
