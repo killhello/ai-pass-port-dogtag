@@ -4,6 +4,7 @@
 #include "dogtag_state.h"
 #include "dogtag_ui.h"
 #include "dogtag_audio.h"
+#include "wifi_portal.h"
 #include "demo_radio.h"
 
 #include "esp_log.h"
@@ -11,6 +12,13 @@
 #include "freertos/task.h"
 
 static const char *TAG = "demo_dogtag";
+
+static void wifi_config_cb(const char *name, const char *phone) {
+    ESP_LOGI(TAG, "WiFi config received: name=%s, phone=%s", name, phone);
+    dogtag_state_set_owner(name, phone);
+    dogtag_state_set_owner_valid(true);
+    dogtag_state_save_nvs();
+}
 
 void demo_dogtag_enter(void) {
     ESP_LOGI(TAG, "enter");
@@ -37,6 +45,14 @@ void demo_dogtag_enter(void) {
         return;
     }
 
+    wifi_portal_set_config_callback(wifi_config_cb);
+    err = wifi_portal_init();
+    if (err == ESP_OK) {
+        wifi_portal_start();
+    } else {
+        ESP_LOGW(TAG, "wifi portal init failed: %d", err);
+    }
+
     dogtag_audio_stop_clear();
 
     if (dogtag_state_get_state() == DOGTAG_STATE_PAIRING) {
@@ -49,6 +65,7 @@ void demo_dogtag_enter(void) {
 void demo_dogtag_exit(void) {
     ESP_LOGI(TAG, "exit");
 
+    wifi_portal_deinit();
     dogtag_audio_deinit();
     dogtag_ui_deinit();
     dogtag_state_deinit();
