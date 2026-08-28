@@ -313,6 +313,8 @@ static void enter_silent_screen(void) {
 // ---------------------------------------------------------------------------
 // BLE
 // ---------------------------------------------------------------------------
+static int gap_event(struct ble_gap_event *ev, void *arg);
+
 static int advertise_conn(void) {
     if (s_advertising) return 0;
     struct ble_hs_adv_fields f = {0};
@@ -325,7 +327,7 @@ static int advertise_conn(void) {
     struct ble_gap_adv_params p = {0};
     p.conn_mode = BLE_GAP_CONN_MODE_UND;
     p.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, NULL, NULL);
+    rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, gap_event, NULL);
     if (rc == 0) s_advertising = true;
     return rc;
 }
@@ -344,7 +346,7 @@ static int advertise_nonconn(void) {
     struct ble_gap_adv_params p = {0};
     p.conn_mode = BLE_GAP_CONN_MODE_NON;
     p.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, NULL, NULL);
+    rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, gap_event, NULL);
     if (rc == 0) s_advertising = true;
     return rc;
 }
@@ -437,6 +439,7 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
             ESP_LOGI(TAG, "-> DEBOUNCE");
             s_state = STATE_DEBOUNCE;
             enter_lost_screen();
+            advertise_nonconn();
             if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
         }
     } else if (ev->type == BLE_GAP_EVENT_ADV_COMPLETE) {

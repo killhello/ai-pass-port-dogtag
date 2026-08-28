@@ -1,20 +1,6 @@
-/*******************************************************************************
- * Size: 16 px
- * Bpp: 4
- * Opts: --font C:/Windows/Fonts/simhei.ttf --symbols  ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:.-+%*/\n?!,# --symbols 电子狗牌配对模式蓝牙写入主人信息走失倒计时电池电话求助帮助我与联系人发送电量正常时间连接断开轻度严重SOS名字紧急请扫描 --size 16 --bpp 4 --no-compress --format lvgl -o E:/GP/ai-passport/main/font_cn_16.c
- ******************************************************************************/
-
-#ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
-#else
-#include "lvgl/lvgl.h"
-#endif
 
-#ifndef FONT_CN_16
-#define FONT_CN_16 1
-#endif
-
-#if FONT_CN_16
+/* font_cn_16 - SimHei 16px */
 
 /*-----------------
  *    BITMAPS
@@ -1454,8 +1440,4 @@ lv_font_t font_cn_16 = {
 #endif
     .user_data = NULL,
 };
-
-
-
-#endif /*#if FONT_CN_16*/
 
