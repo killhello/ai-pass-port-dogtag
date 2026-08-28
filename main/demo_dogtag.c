@@ -455,8 +455,6 @@ static void on_sync(void) {
     int rc = ble_hs_util_ensure_addr(0);
     if (rc == 0) rc = ble_hs_id_infer_auto(0, &s_addr_type);
     if (rc != 0) { ESP_LOGE(TAG, "addr infer failed"); return; }
-    ble_gatts_count_cfg(gatt_svcs);
-    ble_gatts_add_svcs(gatt_svcs);
     if (s_state == STATE_PAIRING) advertise_conn();
     else if (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) advertise_nonconn();
 }
@@ -480,6 +478,8 @@ static esp_err_t ble_start(void) {
     ble_svc_gap_init(); ble_svc_gatt_init();
     char name[24]; snprintf(name, sizeof(name), "%s%04X", DOGTAG_ADV_PREFIX, (unsigned)(esp_random() & 0xFFFF));
     ble_svc_gap_device_name_set(name);
+    ble_gatts_count_cfg(gatt_svcs);
+    ble_gatts_add_svcs(gatt_svcs);
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
     s_start_requested = true;
