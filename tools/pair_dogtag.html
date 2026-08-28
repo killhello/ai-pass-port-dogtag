@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电子狗牌配对</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.card { background: #16213e; border-radius: 16px; padding: 32px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+h1 { text-align: center; font-size: 24px; margin-bottom: 8px; }
+.sub { text-align: center; color: #888; font-size: 14px; margin-bottom: 24px; }
+label { display: block; font-size: 14px; color: #aaa; margin-bottom: 4px; }
+input { width: 100%; padding: 12px; border: 1px solid #333; border-radius: 8px; background: #0f3460; color: #fff; font-size: 16px; margin-bottom: 16px; outline: none; }
+input:focus { border-color: #e94560; }
+button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: .2s; }
+.btn-pair { background: #e94560; color: #fff; }
+.btn-pair:hover { background: #c73a52; }
+.btn-pair:disabled { background: #555; cursor: not-allowed; }
+.msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
+.msg.ok { display: block; background: #1b4332; color: #95d5b2; }
+.msg.err { display: block; background: #3d0814; color: #ff6b6b; }
+.msg.info { display: block; background: #0a1628; color: #5dade2; }
+#status { margin-top: 16px; text-align: center; color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>电子狗牌</h1>
+  <p class="sub">BLE 配对工具</p>
+  <label>主人姓名</label>
+  <input type="text" id="name" placeholder="请输入姓名">
+  <label>联系电话</label>
+  <input type="tel" id="phone" placeholder="请输入电话号码">
+  <button class="btn-pair" id="btn" onclick="pair()">开始配对</button>
+  <div class="msg" id="msg"></div>
+  <p id="status"></p>
+</div>
+
+<script>
+const SVC_UUID  = 'f0debc9a-7856-3412-1234-567812345678';
+const NAME_UUID = 'f1debc9a-7856-3412-1234-567812345678';
+const PHONE_UUID= 'f2debc9a-7856-3412-1234-567812345678';
+const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
+
+function show(text, type='info') {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+
+async function pair() {
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  if (!name || !phone) { show('请填写姓名和电话', 'err'); return; }
+  if (!navigator.bluetooth) { show('浏览器不支持 Web Bluetooth（请用 Chrome）', 'err'); return; }
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  show('正在搜索 DogTag 设备...', 'info');
+
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'DogTag' }],
+      optionalServices: [SVC_UUID]
+    });
+
+    show('正在连接...', 'info');
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SVC_UUID);
+
+    show('正在写入信息...', 'info');
+    const nameChar = await service.getCharacteristic(NAME_UUID);
+    await nameChar.writeValue(new TextEncoder().encode(name));
+
+    const phoneChar = await service.getCharacteristic(PHONE_UUID);
+    await phoneChar.writeValue(new TextEncoder().encode(phone));
+
+    const cmdChar = await service.getCharacteristic(CMD_UUID);
+    await cmdChar.writeValue(new Uint8Array([0x01]));
+
+    show(`配对成功！<br>姓名：${name}<br>电话：${phone}`, 'ok');
+  } catch (e) {
+    if (e.name !== 'NotFoundError') show('配对失败: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
