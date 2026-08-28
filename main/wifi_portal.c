@@ -7,7 +7,6 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
-#include "esp_dns.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "lwip/apps/dhcpserver.h"
