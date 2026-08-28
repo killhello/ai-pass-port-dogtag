@@ -4,7 +4,6 @@
 #include "dogtag_audio.h"
 
 #include "esp_log.h"
-#include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
 #include "esp_event.h"
@@ -167,13 +166,11 @@ static void stop_webserver(void) {
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     if (event_base == WIFI_EVENT) {
         if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-            wifi_event_ap_staconnected_t *evt = (wifi_event_ap_staconnected_t *)event_data;
-            ESP_LOGI(TAG, "Station connected: " MACSTR, MAC2STR(evt->mac));
+            ESP_LOGI(TAG, "Station connected");
             s_station_connected = true;
             xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-            wifi_event_ap_stadisconnected_t *evt = (wifi_event_ap_stadisconnected_t *)event_data;
-            ESP_LOGI(TAG, "Station disconnected: " MACSTR, MAC2STR(evt->mac));
+            ESP_LOGI(TAG, "Station disconnected");
             s_station_connected = false;
             xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
             if (dogtag_state_get_state() == DOGTAG_STATE_PAIRING && dogtag_state_is_owner_valid()) {
