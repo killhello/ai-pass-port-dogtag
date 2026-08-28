@@ -233,7 +233,14 @@ static void host_task(void *arg) {
 esp_err_t ble_dogtag_init(void) {
     if (s_initialized) return ESP_ERR_INVALID_STATE;
 
-    esp_err_t err = nimble_port_init();
+    extern esp_err_t demo_radio_nvs_prepare(void);
+    esp_err_t err = demo_radio_nvs_prepare();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "NVS prepare failed: %d", err);
+        return err;
+    }
+
+    err = nimble_port_init();
     if (err != ESP_OK) return err;
     s_initialized = true;
 
