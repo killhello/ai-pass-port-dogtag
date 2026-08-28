@@ -322,7 +322,7 @@ static int advertise_conn(void) {
     f.name = (const uint8_t *)ble_svc_gap_device_name();
     f.name_len = strlen((const char *)f.name);
     f.name_is_complete = 1;
-    f.uuids128 = (struct ble_uuid128_t[]){
+    f.uuids128 = (const ble_uuid128_t[]){
         BLE_UUID128_INIT(0x78,0x56,0x34,0x12, 0x78,0x56,0x34,0x12,
                           0x12,0x34,0x56,0x78, 0x9a,0xbc,0xde,0xf0)
     };
