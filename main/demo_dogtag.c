@@ -355,6 +355,13 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
     (void)arg; (void)conn; (void)attr;
     const ble_uuid_t *uuid = ctx->chr->uuid;
 
+    ESP_LOGI(TAG, "gatt_access op=%d uuid=%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+             ctx->op,
+             uuid->value.uuid128[15], uuid->value.uuid128[14], uuid->value.uuid128[13], uuid->value.uuid128[12],
+             uuid->value.uuid128[11], uuid->value.uuid128[10], uuid->value.uuid128[9], uuid->value.uuid128[8],
+             uuid->value.uuid128[7], uuid->value.uuid128[6], uuid->value.uuid128[5], uuid->value.uuid128[4],
+             uuid->value.uuid128[3], uuid->value.uuid128[2], uuid->value.uuid128[1], uuid->value.uuid128[0]);
+
     if (ctx->op == BLE_GATT_ACCESS_OP_READ_CHR) {
         if (ble_uuid_cmp(uuid, &chr_name_uuid.u) == 0) {
             os_mbuf_append(ctx->om, s_owner_name, strlen(s_owner_name)); return 0;
@@ -367,6 +374,7 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
             uint8_t v = (soc >= 0 && soc <= 100) ? (uint8_t)soc : 0;
             os_mbuf_append(ctx->om, &v, 1); return 0;
         }
+        ESP_LOGW(TAG, "read unknown uuid");
         return BLE_ATT_ERR_UNLIKELY;
     }
 
@@ -374,12 +382,12 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
         if (ble_uuid_cmp(uuid, &chr_name_uuid.u) == 0) {
             size_t n = ctx->om->om_len < DOGTAG_NAME_MAX-1 ? ctx->om->om_len : DOGTAG_NAME_MAX-1;
             memcpy(s_owner_name, ctx->om->om_data, n); s_owner_name[n] = 0;
-            ESP_LOGI(TAG, "name: %s", s_owner_name); return 0;
+            ESP_LOGI(TAG, "name write: %s", s_owner_name); return 0;
         }
         if (ble_uuid_cmp(uuid, &chr_phone_uuid.u) == 0) {
             size_t n = ctx->om->om_len < DOGTAG_PHONE_MAX-1 ? ctx->om->om_len : DOGTAG_PHONE_MAX-1;
             memcpy(s_owner_phone, ctx->om->om_data, n); s_owner_phone[n] = 0;
-            ESP_LOGI(TAG, "phone: %s", s_owner_phone); return 0;
+            ESP_LOGI(TAG, "phone write: %s", s_owner_phone); return 0;
         }
         if (ble_uuid_cmp(uuid, &chr_cmd_uuid.u) == 0) {
             uint8_t cmd = ctx->om->om_data[0];
@@ -392,6 +400,7 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
             }
             return 0;
         }
+        ESP_LOGW(TAG, "write unknown uuid");
         return BLE_ATT_ERR_UNLIKELY;
     }
     return BLE_ATT_ERR_UNLIKELY;
@@ -425,11 +434,6 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
                 if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
                 enter_silent_screen();
             }
-            struct ble_gap_upd_params u = {
-                .itvl_min = 0x18, .itvl_max = 0x30,
-                .latency = 0, .supervision_timeout = 600
-            };
-            ble_gap_update_params(s_conn_handle, &u);
         } else {
             ESP_LOGW(TAG, "connect failed: %d", ev->connect.status);
         }
@@ -487,9 +491,6 @@ static esp_err_t ble_start(void) {
         return ESP_ERR_NO_MEM;
     }
 
-    ble_hs_cfg.reset_cb = on_reset;
-    ble_hs_cfg.sync_cb = on_sync;
-
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
@@ -500,6 +501,9 @@ static esp_err_t ble_start(void) {
         ESP_LOGE(TAG, "device name set failed: %d", rc);
         goto fail;
     }
+
+    ble_hs_cfg.reset_cb = on_reset;
+    ble_hs_cfg.sync_cb = on_sync;
 
     rc = ble_gatts_count_cfg(gatt_svcs);
     if (rc != 0) {
