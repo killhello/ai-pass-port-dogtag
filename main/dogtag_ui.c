@@ -31,29 +31,6 @@ static void destroy_screen(void) {
     s_lbl_phone = s_lbl_sos = s_lbl_cd = s_mascot = NULL;
 }
 
-static void ui_tick(lv_timer_t *t) {
-    (void)t;
-    if (!s_panel) return;
-
-    dogtag_state_t state = dogtag_state_get_state();
-    if (state == DOGTAG_STATE_MILD_LOST || state == DOGTAG_STATE_SEVERE_LOST) {
-        extern volatile bool s_flash_on;
-        if (s_flash_on) {
-            lv_color_t bg = lv_color_hex(0xFF4444);
-            lv_obj_set_style_bg_color(s_panel, bg, 0);
-        }
-    }
-    if (state == DOGTAG_STATE_MILD_LOST && s_lbl_cd) {
-        int cd = dogtag_state_get_countdown();
-        lv_label_set_text_fmt(s_lbl_cd, "%d:%02d", cd / 60, cd % 60);
-    }
-    if ((state == DOGTAG_STATE_MILD_LOST || state == DOGTAG_STATE_SEVERE_LOST) && s_lbl_soc) {
-        extern int bsp_battery_soc(void);
-        int soc = bsp_battery_soc();
-        lv_label_set_text_fmt(s_lbl_soc, "%d%%", soc);
-    }
-}
-
 void dogtag_ui_init(void) {
     s_scr = s_panel = s_lbl_title = s_lbl_soc = NULL;
     s_lbl_name = s_lbl_phone = s_lbl_sos = s_lbl_cd = s_mascot = NULL;
