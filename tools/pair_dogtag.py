@@ -9,7 +9,7 @@ except ImportError:
     print("请先安装 bleak: pip install bleak")
     sys.exit(1)
 
-# GATT UUID（与固件一致）
+# GATT UUID（与固件一致，NimBLE little-endian 转 big-endian）
 SVC_UUID  = "f0debc9a-7856-3412-1234-567812345678"
 NAME_UUID = "f1debc9a-7856-3412-1234-567812345678"
 PHONE_UUID= "f2debc9a-7856-3412-1234-567812345678"
