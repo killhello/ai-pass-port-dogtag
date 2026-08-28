@@ -317,15 +317,15 @@ static int gap_event(struct ble_gap_event *ev, void *arg);
 
 static int advertise_conn(void) {
     if (s_advertising) return 0;
+    static const ble_uuid128_t adv_svc_uuid =
+        BLE_UUID128_INIT(0x78,0x56,0x34,0x12, 0x78,0x56,0x34,0x12,
+                          0x12,0x34,0x56,0x78, 0x9a,0xbc,0xde,0xf0);
     struct ble_hs_adv_fields f = {0};
     f.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     f.name = (const uint8_t *)ble_svc_gap_device_name();
     f.name_len = strlen((const char *)f.name);
     f.name_is_complete = 1;
-    f.uuids128 = (const ble_uuid128_t[]){
-        BLE_UUID128_INIT(0x78,0x56,0x34,0x12, 0x78,0x56,0x34,0x12,
-                          0x12,0x34,0x56,0x78, 0x9a,0xbc,0xde,0xf0)
-    };
+    f.uuids128 = &adv_svc_uuid;
     f.num_uuids128 = 1;
     f.uuids128_is_complete = 0;
     int rc = ble_gap_adv_set_fields(&f);
