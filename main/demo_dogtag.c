@@ -328,6 +328,8 @@ static int advertise(void) {
     f.name = (const uint8_t *)ble_svc_gap_device_name();
     f.name_len = strlen((const char *)f.name);
     f.name_is_complete = 1;
+    f.uuids128 = &svc_uuid;
+    f.num_uuids128 = 1;
     int rc = ble_gap_adv_set_fields(&f);
     if (rc != 0) {
         ESP_LOGE(TAG, "adv set fields failed: %d", rc);
@@ -426,8 +428,8 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
                 enter_silent_screen();
             }
             struct ble_gap_upd_params u = {
-                .itvl_min = 0x18, .itvl_max = 0x30,
-                .latency = 0, .supervision_timeout = 600
+                .itvl_min = 0x06, .itvl_max = 0x0C,
+                .latency = 3, .supervision_timeout = 300
             };
             ble_gap_update_params(s_conn_handle, &u);
         } else {
@@ -487,11 +489,11 @@ static esp_err_t ble_start(void) {
         return ESP_ERR_NO_MEM;
     }
 
-    ble_hs_cfg.reset_cb = on_reset;
-    ble_hs_cfg.sync_cb = on_sync;
-
     ble_svc_gap_init();
     ble_svc_gatt_init();
+
+    ble_hs_cfg.reset_cb = on_reset;
+    ble_hs_cfg.sync_cb = on_sync;
 
     char name[24];
     snprintf(name, sizeof(name), "%s%04X", DOGTAG_ADV_PREFIX, (unsigned)(esp_random() & 0xFFFF));
