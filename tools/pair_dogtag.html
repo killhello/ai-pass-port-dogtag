@@ -62,7 +62,7 @@ async function pair() {
   try {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'DogTag' }],
-      optionalServices: [SVC_UUID]
+      optionalServices: [SVC_UUID, NAME_UUID, PHONE_UUID, CMD_UUID]
     });
 
     show('正在连接...', 'info');

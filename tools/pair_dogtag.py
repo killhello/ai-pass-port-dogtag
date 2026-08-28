@@ -24,7 +24,12 @@ async def main():
         return
 
     print("正在搜索 DogTag 设备...")
-    device = await BleakScanner.find_device_by_name("DogTag", timeout=10)
+    devices = await BleakScanner.discover(timeout=10)
+    device = None
+    for d in devices:
+        if d.name and d.name.startswith("DogTag"):
+            device = d
+            break
     if not device:
         print("未找到 DogTag 设备，请确认设备已开机")
         return

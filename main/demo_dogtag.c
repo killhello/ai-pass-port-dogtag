@@ -22,7 +22,6 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include <string.h>
 
-// 中文字体（lv_font_conv 生成）
 extern const lv_font_t font_cn_16;
 extern const lv_font_t font_cn_20;
 
@@ -103,6 +102,7 @@ static void nvs_load(void) {
 out:
     nvs_close(h);
 }
+
 static void nvs_save(void) {
     nvs_handle_t h;
     if (nvs_open("dogtag", NVS_READWRITE, &h) != ESP_OK) return;
@@ -126,7 +126,8 @@ static void play_wav(int volume) {
     const uint8_t *pcm = NULL;
     uint32_t pcm_len = 0;
     while (pos + 8 <= len) {
-        uint32_t cs = *(const uint32_t *)(data + pos + 4);
+        uint32_t cs;
+        memcpy(&cs, data + pos + 4, sizeof(cs));
         if (memcmp(data + pos, "data", 4) == 0) { pcm = data + pos + 8; pcm_len = cs; break; }
         pos += 8 + cs;
     }
@@ -286,7 +287,6 @@ static void enter_lost_screen(void) {
     bsp_lvgl_unlock();
 }
 
-// BLE screens for silent state
 static void enter_silent_screen(void) {
     if (!bsp_lvgl_lock(500)) return;
     destroy_screen();
@@ -315,45 +315,27 @@ static void enter_silent_screen(void) {
 // ---------------------------------------------------------------------------
 static int gap_event(struct ble_gap_event *ev, void *arg);
 
-static int advertise_conn(void) {
+static int advertise(void) {
     if (s_advertising) return 0;
-    static const ble_uuid128_t adv_svc_uuid =
-        BLE_UUID128_INIT(0x78,0x56,0x34,0x12, 0x78,0x56,0x34,0x12,
-                          0x12,0x34,0x56,0x78, 0x9a,0xbc,0xde,0xf0);
     struct ble_hs_adv_fields f = {0};
     f.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
     f.name = (const uint8_t *)ble_svc_gap_device_name();
     f.name_len = strlen((const char *)f.name);
     f.name_is_complete = 1;
-    f.uuids128 = &adv_svc_uuid;
-    f.num_uuids128 = 1;
-    f.uuids128_is_complete = 0;
     int rc = ble_gap_adv_set_fields(&f);
-    if (rc != 0) return rc;
+    if (rc != 0) {
+        ESP_LOGE(TAG, "adv set fields failed: %d", rc);
+        return rc;
+    }
     struct ble_gap_adv_params p = {0};
     p.conn_mode = BLE_GAP_CONN_MODE_UND;
     p.disc_mode = BLE_GAP_DISC_MODE_GEN;
     rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, gap_event, NULL);
-    if (rc == 0) s_advertising = true;
-    return rc;
-}
-
-static int advertise_nonconn(void) {
-    if (s_advertising) return 0;
-    struct ble_hs_adv_fields f = {0};
-    f.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    char name[24];
-    snprintf(name, sizeof(name), "%s", DOGTAG_ADV_PREFIX);
-    f.name = (const uint8_t *)name;
-    f.name_len = strlen(name);
-    f.name_is_complete = 1;
-    int rc = ble_gap_adv_set_fields(&f);
-    if (rc != 0) return rc;
-    struct ble_gap_adv_params p = {0};
-    p.conn_mode = BLE_GAP_CONN_MODE_NON;
-    p.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, gap_event, NULL);
-    if (rc == 0) s_advertising = true;
+    if (rc == 0) {
+        s_advertising = true;
+    } else {
+        ESP_LOGE(TAG, "adv start failed: %d", rc);
+    }
     return rc;
 }
 
@@ -419,6 +401,20 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {{
     },
 }, { 0 }};
 
+static void enter_lost_state(dogtag_state_t new_state) {
+    s_state = new_state;
+    s_audio_stop = false;
+    enter_lost_screen();
+    advertise();
+    if (new_state == STATE_DEBOUNCE) {
+        s_countdown = MILD_TIMEOUT_SEC_DEFAULT;
+        if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
+    } else if (new_state == STATE_MILD_LOST) {
+        if (s_countdown_tmr) xTimerStart(s_countdown_tmr, 0);
+        if (s_flash_tmr) xTimerStart(s_flash_tmr, 0);
+    }
+}
+
 static int gap_event(struct ble_gap_event *ev, void *arg) {
     (void)arg;
     if (ev->type == BLE_GAP_EVENT_CONNECT) {
@@ -443,14 +439,12 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         if (s_state == STATE_SILENT && s_owner_valid) {
             ESP_LOGI(TAG, "-> DEBOUNCE");
-            s_state = STATE_DEBOUNCE;
-            enter_lost_screen();
-            advertise_nonconn();
-            if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
+            enter_lost_state(STATE_DEBOUNCE);
+        } else if (s_state == STATE_PAIRING) {
+            advertise();
         }
     } else if (ev->type == BLE_GAP_EVENT_ADV_COMPLETE) {
-        if (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) advertise_nonconn();
-        else if (s_advertising) advertise_conn();
+        advertise();
     }
     return 0;
 }
@@ -461,8 +455,7 @@ static void on_sync(void) {
     int rc = ble_hs_util_ensure_addr(0);
     if (rc == 0) rc = ble_hs_id_infer_auto(0, &s_addr_type);
     if (rc != 0) { ESP_LOGE(TAG, "addr infer failed"); return; }
-    if (s_state == STATE_PAIRING) advertise_conn();
-    else if (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) advertise_nonconn();
+    advertise();
 }
 
 static void host_task(void *arg) {
@@ -474,18 +467,50 @@ static void host_task(void *arg) {
 
 static esp_err_t ble_start(void) {
     if (s_initialized) return ESP_ERR_INVALID_STATE;
+
     esp_err_t err = demo_radio_nvs_prepare();
     if (err != ESP_OK) return err;
+
     err = nimble_port_init();
     if (err != ESP_OK) return err;
     s_initialized = true;
+
     s_host_stopped = xSemaphoreCreateBinary();
-    if (!s_host_stopped) { nimble_port_deinit(); s_initialized = false; return ESP_ERR_NO_MEM; }
-    ble_svc_gap_init(); ble_svc_gatt_init();
-    char name[24]; snprintf(name, sizeof(name), "%s%04X", DOGTAG_ADV_PREFIX, (unsigned)(esp_random() & 0xFFFF));
-    ble_svc_gap_device_name_set(name);
-    ble_gatts_count_cfg(gatt_svcs);
-    ble_gatts_add_svcs(gatt_svcs);
+    if (!s_host_stopped) {
+        nimble_port_deinit();
+        s_initialized = false;
+        return ESP_ERR_NO_MEM;
+    }
+
+    ble_svc_gap_init();
+    ble_svc_gatt_init();
+
+    char name[24];
+    snprintf(name, sizeof(name), "%s%04X", DOGTAG_ADV_PREFIX, (unsigned)(esp_random() & 0xFFFF));
+    int rc = ble_svc_gap_device_name_set(name);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "device name set failed: %d", rc);
+        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
+        nimble_port_deinit(); s_initialized = false;
+        return ESP_FAIL;
+    }
+
+    rc = ble_gatts_count_cfg(gatt_svcs);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "gatts count cfg failed: %d", rc);
+        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
+        nimble_port_deinit(); s_initialized = false;
+        return ESP_FAIL;
+    }
+
+    rc = ble_gatts_add_svcs(gatt_svcs);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "gatts add svcs failed: %d", rc);
+        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
+        nimble_port_deinit(); s_initialized = false;
+        return ESP_FAIL;
+    }
+
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
     s_start_requested = true;
@@ -555,6 +580,14 @@ void demo_dogtag_key(bsp_btn_t btn, bsp_btn_ev_t ev) {
         nvs_save();
         s_state = STATE_SILENT;
         s_audio_stop = true;
+        enter_silent_screen();
+    }
+    if (btn == BSP_BTN_OK && (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST)) {
+        s_state = STATE_SILENT;
+        s_audio_stop = true;
+        if (s_debounce_tmr) xTimerStop(s_debounce_tmr, 0);
+        if (s_countdown_tmr) xTimerStop(s_countdown_tmr, 0);
+        if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
         enter_silent_screen();
     }
     if (btn == BSP_BTN_UP && (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST)) {
