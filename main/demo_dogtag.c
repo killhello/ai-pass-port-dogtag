@@ -87,6 +87,7 @@ static lv_timer_t *s_ui_tmr;
 
 static TaskHandle_t s_audio_task;
 static volatile bool s_audio_stop;
+static volatile bool s_find_me_request;
 
 // ---------------------------------------------------------------------------
 // NVS
@@ -155,6 +156,11 @@ static void play_beep(void) {
 static void audio_task(void *arg) {
     (void)arg;
     for (;;) {
+        if (s_find_me_request) {
+            s_find_me_request = false;
+            play_wav(90);
+            continue;
+        }
         if (s_state == STATE_MILD_LOST && !s_audio_stop) {
             play_beep();
             vTaskDelay(pdMS_TO_TICKS(5000));
@@ -330,6 +336,8 @@ static int advertise(void) {
     struct ble_gap_adv_params p = {0};
     p.conn_mode = BLE_GAP_CONN_MODE_UND;
     p.disc_mode = BLE_GAP_DISC_MODE_GEN;
+    p.itvl_min = 0x20;
+    p.itvl_max = 0x40;
     rc = ble_gap_adv_start(s_addr_type, NULL, BLE_HS_FOREVER, &p, gap_event, NULL);
     if (rc == 0) {
         s_advertising = true;
@@ -380,7 +388,7 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
                 ESP_LOGI(TAG, "pair complete");
                 ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
             } else if (cmd == CMD_FIND_ME && s_state == STATE_SEVERE_LOST) {
-                play_wav(90);
+                s_find_me_request = true;
             }
             return 0;
         }
@@ -401,20 +409,6 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {{
     },
 }, { 0 }};
 
-static void enter_lost_state(dogtag_state_t new_state) {
-    s_state = new_state;
-    s_audio_stop = false;
-    enter_lost_screen();
-    advertise();
-    if (new_state == STATE_DEBOUNCE) {
-        s_countdown = MILD_TIMEOUT_SEC_DEFAULT;
-        if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
-    } else if (new_state == STATE_MILD_LOST) {
-        if (s_countdown_tmr) xTimerStart(s_countdown_tmr, 0);
-        if (s_flash_tmr) xTimerStart(s_flash_tmr, 0);
-    }
-}
-
 static int gap_event(struct ble_gap_event *ev, void *arg) {
     (void)arg;
     if (ev->type == BLE_GAP_EVENT_CONNECT) {
@@ -431,16 +425,26 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
                 if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
                 enter_silent_screen();
             }
-            struct ble_gap_upd_params u = { .itvl_min=0x1000, .itvl_max=0x1000, .latency=4, .supervision_timeout=600 };
+            struct ble_gap_upd_params u = {
+                .itvl_min = 0x18, .itvl_max = 0x30,
+                .latency = 0, .supervision_timeout = 600
+            };
             ble_gap_update_params(s_conn_handle, &u);
+        } else {
+            ESP_LOGW(TAG, "connect failed: %d", ev->connect.status);
         }
     } else if (ev->type == BLE_GAP_EVENT_DISCONNECT) {
-        ESP_LOGI(TAG, "BLE disconnected");
+        ESP_LOGI(TAG, "BLE disconnected, reason=%d", ev->disconnect.reason);
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         if (s_state == STATE_SILENT && s_owner_valid) {
             ESP_LOGI(TAG, "-> DEBOUNCE");
-            enter_lost_state(STATE_DEBOUNCE);
-        } else if (s_state == STATE_PAIRING) {
+            s_state = STATE_DEBOUNCE;
+            s_countdown = MILD_TIMEOUT_SEC_DEFAULT;
+            s_audio_stop = false;
+            enter_lost_screen();
+            advertise();
+            if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
+        } else {
             advertise();
         }
     } else if (ev->type == BLE_GAP_EVENT_ADV_COMPLETE) {
@@ -454,7 +458,8 @@ static void on_reset(int reason) { ESP_LOGE(TAG, "nimble reset %d", reason); }
 static void on_sync(void) {
     int rc = ble_hs_util_ensure_addr(0);
     if (rc == 0) rc = ble_hs_id_infer_auto(0, &s_addr_type);
-    if (rc != 0) { ESP_LOGE(TAG, "addr infer failed"); return; }
+    if (rc != 0) { ESP_LOGE(TAG, "addr infer failed: %d", rc); return; }
+    ESP_LOGI(TAG, "on_sync addr_type=%d", s_addr_type);
     advertise();
 }
 
@@ -482,6 +487,9 @@ static esp_err_t ble_start(void) {
         return ESP_ERR_NO_MEM;
     }
 
+    ble_hs_cfg.reset_cb = on_reset;
+    ble_hs_cfg.sync_cb = on_sync;
+
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
@@ -490,32 +498,29 @@ static esp_err_t ble_start(void) {
     int rc = ble_svc_gap_device_name_set(name);
     if (rc != 0) {
         ESP_LOGE(TAG, "device name set failed: %d", rc);
-        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
-        nimble_port_deinit(); s_initialized = false;
-        return ESP_FAIL;
+        goto fail;
     }
 
     rc = ble_gatts_count_cfg(gatt_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts count cfg failed: %d", rc);
-        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
-        nimble_port_deinit(); s_initialized = false;
-        return ESP_FAIL;
+        goto fail;
     }
 
     rc = ble_gatts_add_svcs(gatt_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts add svcs failed: %d", rc);
-        vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
-        nimble_port_deinit(); s_initialized = false;
-        return ESP_FAIL;
+        goto fail;
     }
 
-    ble_hs_cfg.reset_cb = on_reset;
-    ble_hs_cfg.sync_cb = on_sync;
     s_start_requested = true;
     nimble_port_freertos_init(host_task);
     return ESP_OK;
+
+fail:
+    vSemaphoreDelete(s_host_stopped); s_host_stopped = NULL;
+    nimble_port_deinit(); s_initialized = false;
+    return ESP_FAIL;
 }
 
 static void ble_stop(void) {
@@ -588,6 +593,7 @@ void demo_dogtag_key(bsp_btn_t btn, bsp_btn_ev_t ev) {
         if (s_debounce_tmr) xTimerStop(s_debounce_tmr, 0);
         if (s_countdown_tmr) xTimerStop(s_countdown_tmr, 0);
         if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
+        adv_stop();
         enter_silent_screen();
     }
     if (btn == BSP_BTN_UP && (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST)) {
