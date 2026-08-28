@@ -1,11 +1,4 @@
 // main/demo_dogtag.c — 电子狗牌：防抖 + 轻度走失 + 重度走失
-//
-// 状态流转：
-//   SILENT（BLE已连接）→ DEBOUNCE（断开防抖2秒）
-//   → MILD_LOST（轻度走失，10分钟倒计时）
-//   → SEVERE_LOST（重度走失，人声+蜂鸣+闪烁）
-//   任意时刻重连 → SILENT
-//
 #include "demo.h"
 #include "demo_radio.h"
 #include "bsp_audio.h"
@@ -29,20 +22,19 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include <string.h>
 
+// 中文字体（lv_font_conv 生成）
+extern const lv_font_t font_cn_16;
+extern const lv_font_t font_cn_20;
+
 static const char *TAG = "demo_dogtag";
 
-// ---------------------------------------------------------------------------
-// 配置
 // ---------------------------------------------------------------------------
 #define DOGTAG_NAME_MAX   32
 #define DOGTAG_PHONE_MAX  20
 #define DOGTAG_ADV_PREFIX "DogTag"
 #define DEBOUNCE_SEC_DEFAULT       2
-#define MILD_TIMEOUT_SEC_DEFAULT   600   // 10 分钟
-#define BEEP_INTERVAL_SEC_DEFAULT  5
-#define VOICE_INTERVAL_SEC_DEFAULT 8
+#define MILD_TIMEOUT_SEC_DEFAULT   600
 
-// GATT UUIDs: 12345678-1234-5678-1234-56789abcdefX
 static const ble_uuid128_t svc_uuid =
     BLE_UUID128_INIT(0x78,0x56,0x34,0x12, 0x78,0x56,0x34,0x12,
                       0x12,0x34,0x56,0x78, 0x9a,0xbc,0xde,0xf0);
@@ -62,9 +54,6 @@ static const ble_uuid128_t chr_cmd_uuid =
 #define CMD_PAIR_COMPLETE  0x01
 #define CMD_FIND_ME        0x02
 
-// ---------------------------------------------------------------------------
-// 状态
-// ---------------------------------------------------------------------------
 typedef enum {
     STATE_INIT = 0,
     STATE_PAIRING,
@@ -79,7 +68,6 @@ static char s_owner_name[DOGTAG_NAME_MAX];
 static char s_owner_phone[DOGTAG_PHONE_MAX];
 static bool s_owner_valid;
 
-// BLE
 static SemaphoreHandle_t s_host_stopped;
 static bool s_initialized;
 static bool s_start_requested;
@@ -87,20 +75,17 @@ static uint8_t s_addr_type;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static bool s_advertising;
 
-// 定时器
 static TimerHandle_t s_debounce_tmr;
 static TimerHandle_t s_countdown_tmr;
 static TimerHandle_t s_flash_tmr;
 static int s_countdown;
 static volatile bool s_flash_on;
 
-// UI
 static lv_obj_t *s_scr, *s_panel, *s_lbl_title, *s_lbl_soc;
 static lv_obj_t *s_lbl_name, *s_lbl_phone, *s_lbl_sos, *s_lbl_cd;
 static lv_obj_t *s_mascot;
 static lv_timer_t *s_ui_tmr;
 
-// 音频
 static TaskHandle_t s_audio_task;
 static volatile bool s_audio_stop;
 
@@ -137,8 +122,6 @@ static void play_wav(int volume) {
     const uint8_t *data = dogtag_help_wav_start;
     size_t len = (size_t)(dogtag_help_wav_end - dogtag_help_wav_start);
     if (len < 44 || memcmp(data, "RIFF", 4) != 0) return;
-
-    // skip to data chunk
     size_t pos = 12;
     const uint8_t *pcm = NULL;
     uint32_t pcm_len = 0;
@@ -148,7 +131,6 @@ static void play_wav(int volume) {
         pos += 8 + cs;
     }
     if (!pcm) return;
-
     bsp_audio_set_format(16000, 16, 1);
     bsp_audio_set_volume(volume);
     size_t written = 0;
@@ -196,8 +178,7 @@ static void audio_task(void *arg) {
 // ---------------------------------------------------------------------------
 static void debounce_cb(TimerHandle_t t) {
     (void)t;
-    ESP_LOGI(TAG, "debounce timeout -> MILD_LOST");
-    // 防抖结束仍断开 → 进入轻度走失
+    ESP_LOGI(TAG, "debounce -> MILD_LOST");
     s_state = STATE_MILD_LOST;
     s_countdown = MILD_TIMEOUT_SEC_DEFAULT;
     s_audio_stop = false;
@@ -209,7 +190,7 @@ static void countdown_cb(TimerHandle_t t) {
     (void)t;
     if (s_countdown > 0) s_countdown--;
     if (s_countdown <= 0 && s_state == STATE_MILD_LOST) {
-        ESP_LOGI(TAG, "countdown expired -> SEVERE_LOST");
+        ESP_LOGI(TAG, "countdown -> SEVERE_LOST");
         s_state = STATE_SEVERE_LOST;
         if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
         if (s_countdown_tmr) xTimerStop(s_countdown_tmr, 0);
@@ -230,7 +211,6 @@ static void destroy_screen(void) {
     s_lbl_phone = s_lbl_sos = s_lbl_cd = s_mascot = NULL;
 }
 
-// LVGL timer: 刷新闪烁和倒计时（运行在 LVGL 任务，不需要加锁）
 static void ui_tick(lv_timer_t *t) {
     (void)t;
     if ((s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) && s_panel) {
@@ -238,11 +218,11 @@ static void ui_tick(lv_timer_t *t) {
         lv_obj_set_style_bg_color(s_panel, bg, 0);
     }
     if (s_state == STATE_MILD_LOST && s_lbl_cd) {
-        lv_label_set_text_fmt(s_lbl_cd, "Timeout: %d:%02d", s_countdown / 60, s_countdown % 60);
+        lv_label_set_text_fmt(s_lbl_cd, "%d:%02d", s_countdown / 60, s_countdown % 60);
     }
     if ((s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) && s_lbl_soc) {
         int soc = bsp_battery_soc();
-        lv_label_set_text_fmt(s_lbl_soc, "Battery: %d%%", soc);
+        lv_label_set_text_fmt(s_lbl_soc, "%d%%", soc);
     }
 }
 
@@ -252,11 +232,12 @@ static void enter_pairing_screen(void) {
     s_scr = ui_pixel_screen_create("DOG TAG");
     lv_obj_t *panel = ui_pixel_panel_create(s_scr, 22, 58, 196, 180, UI_PAPER);
     s_lbl_sos = lv_label_create(panel);
+    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_16, 0);
     lv_obj_set_width(s_lbl_sos, 168);
     lv_obj_set_style_text_align(s_lbl_sos, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_INK), 0);
     lv_obj_center(s_lbl_sos);
-    lv_label_set_text(s_lbl_sos, "PAIRING MODE\n\nScan BLE to\nwrite owner info");
+    lv_label_set_text(s_lbl_sos, "\n\n黑狗牌走失\n\n" "BLE 设置主人信息");
     s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
@@ -269,38 +250,60 @@ static void enter_lost_screen(void) {
     s_panel = ui_pixel_panel_create(s_scr, 18, 54, 204, 190, UI_PAPER);
 
     s_lbl_title = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_title, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_INK), 0);
     lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 4);
     lv_label_set_text(s_lbl_title, "DOG TAG");
 
     s_lbl_soc = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_soc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_soc, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_soc, lv_color_hex(UI_INK), 0);
     lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_LEFT, 6, 26);
 
     s_lbl_cd = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_cd, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_cd, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_cd, lv_color_hex(UI_RED), 0);
     lv_obj_align(s_lbl_cd, LV_ALIGN_TOP_LEFT, 6, 46);
 
     s_lbl_name = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_name, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
     lv_obj_align(s_lbl_name, LV_ALIGN_TOP_LEFT, 6, 70);
-    lv_label_set_text_fmt(s_lbl_name, "Name: %s", s_owner_valid ? s_owner_name : "---");
 
     s_lbl_phone = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_phone, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_RED), 0);
     lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_LEFT, 6, 94);
-    lv_label_set_text_fmt(s_lbl_phone, "Tel: %s", s_owner_valid ? s_owner_phone : "---");
 
     s_lbl_sos = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_sos, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_RED), 0);
     lv_obj_align(s_lbl_sos, LV_ALIGN_TOP_MID, 0, 128);
-    lv_label_set_text(s_lbl_sos, "SOS - Please help!");
+    lv_label_set_text(s_lbl_sos, "SOS");
+
+    s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
+    lv_screen_load(s_scr);
+    bsp_lvgl_unlock();
+}
+
+// BLE screens for silent state
+static void enter_silent_screen(void) {
+    if (!bsp_lvgl_lock(500)) return;
+    destroy_screen();
+    s_scr = ui_pixel_screen_create("DOG TAG");
+    s_panel = ui_pixel_panel_create(s_scr, 18, 54, 204, 190, UI_PAPER);
+
+    s_lbl_title = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_title, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_INK), 0);
+    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 4);
+    lv_label_set_text(s_lbl_title, "DOG TAG");
+
+    s_lbl_soc = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_soc, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_soc, lv_color_hex(UI_INK), 0);
+    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_label_set_text(s_lbl_soc, "BLE");
 
     s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
     lv_screen_load(s_scr);
@@ -308,7 +311,7 @@ static void enter_lost_screen(void) {
 }
 
 // ---------------------------------------------------------------------------
-// BLE: 广播
+// BLE
 // ---------------------------------------------------------------------------
 static int advertise_conn(void) {
     if (s_advertising) return 0;
@@ -350,9 +353,6 @@ static void adv_stop(void) {
     if (s_advertising) { ble_gap_adv_stop(); s_advertising = false; }
 }
 
-// ---------------------------------------------------------------------------
-// BLE: GATT access callback (单一 access_cb 处理读写)
-// ---------------------------------------------------------------------------
 static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt *ctx, void *arg) {
     (void)arg; (void)conn; (void)attr;
     const ble_uuid_t *uuid = ctx->chr->uuid;
@@ -411,9 +411,6 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {{
     },
 }, { 0 }};
 
-// ---------------------------------------------------------------------------
-// BLE: GAP events
-// ---------------------------------------------------------------------------
 static int gap_event(struct ble_gap_event *ev, void *arg) {
     (void)arg;
     if (ev->type == BLE_GAP_EVENT_CONNECT) {
@@ -421,7 +418,6 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
             ESP_LOGI(TAG, "BLE connected");
             s_conn_handle = ev->connect.conn_handle;
             adv_stop();
-            // 重连 → 回到静默
             if (s_state == STATE_DEBOUNCE || s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST) {
                 ESP_LOGI(TAG, "reconnected -> SILENT");
                 s_state = STATE_SILENT;
@@ -429,11 +425,8 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
                 if (s_debounce_tmr) xTimerStop(s_debounce_tmr, 0);
                 if (s_countdown_tmr) xTimerStop(s_countdown_tmr, 0);
                 if (s_flash_tmr) xTimerStop(s_flash_tmr, 0);
-                if (!bsp_lvgl_lock(500)) return 0;
-                destroy_screen();
-                bsp_lvgl_unlock();
+                enter_silent_screen();
             }
-            // 请求最大连接间隔省电
             struct ble_gap_upd_params u = { .itvl_min=0x1000, .itvl_max=0x1000, .latency=4, .supervision_timeout=600 };
             ble_gap_update_params(s_conn_handle, &u);
         }
@@ -441,9 +434,9 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
         ESP_LOGI(TAG, "BLE disconnected");
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         if (s_state == STATE_SILENT && s_owner_valid) {
-            // 已配对设备断开 → 防抖
             ESP_LOGI(TAG, "-> DEBOUNCE");
             s_state = STATE_DEBOUNCE;
+            enter_lost_screen();
             if (s_debounce_tmr) xTimerReset(s_debounce_tmr, 0);
         }
     } else if (ev->type == BLE_GAP_EVENT_ADV_COMPLETE) {
@@ -453,9 +446,6 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
     return 0;
 }
 
-// ---------------------------------------------------------------------------
-// BLE: init / deinit (复用 demo_radio + demo_ble 的成功模式)
-// ---------------------------------------------------------------------------
 static void on_reset(int reason) { ESP_LOGE(TAG, "nimble reset %d", reason); }
 
 static void on_sync(void) {
@@ -505,15 +495,12 @@ static void ble_stop(void) {
 }
 
 // ---------------------------------------------------------------------------
-// demo_entry_t interface
+// Public API
 // ---------------------------------------------------------------------------
 void demo_dogtag_enter(void) {
     ESP_LOGI(TAG, "enter");
-
-    // 加载主人信息
     nvs_load();
 
-    // 决定初始状态
     if (s_owner_valid) {
         s_state = STATE_SILENT;
         ESP_LOGI(TAG, "owner: %s/%s", s_owner_name, s_owner_phone);
@@ -522,7 +509,6 @@ void demo_dogtag_enter(void) {
         ESP_LOGI(TAG, "no owner -> pairing");
     }
 
-    // 创建定时器
     if (!s_debounce_tmr)
         s_debounce_tmr = xTimerCreate("deb", pdMS_TO_TICKS(DEBOUNCE_SEC_DEFAULT*1000), pdFALSE, NULL, debounce_cb);
     if (!s_countdown_tmr)
@@ -530,17 +516,13 @@ void demo_dogtag_enter(void) {
     if (!s_flash_tmr)
         s_flash_tmr = xTimerCreate("flash", pdMS_TO_TICKS(500), pdTRUE, NULL, flash_cb);
 
-    // 启动 BLE
     ble_start();
-
-    // 启动音频任务
     s_audio_stop = (s_state == STATE_SILENT);
     if (!s_audio_task) xTaskCreate(audio_task, "dogtag_audio", 4096, NULL, 3, &s_audio_task);
-
-    // UI
     if (!s_ui_tmr) s_ui_tmr = lv_timer_create(ui_tick, 1000, NULL);
 
     if (s_state == STATE_PAIRING) enter_pairing_screen();
+    else enter_silent_screen();
 }
 
 void demo_dogtag_exit(void) {
@@ -560,16 +542,12 @@ void demo_dogtag_exit(void) {
 
 void demo_dogtag_key(bsp_btn_t btn, bsp_btn_ev_t ev) {
     if (ev != BSP_BTN_CLICK) return;
-    // 配对模式：确定键手动完成配对
     if (btn == BSP_BTN_OK && s_state == STATE_PAIRING && s_owner_valid) {
         nvs_save();
         s_state = STATE_SILENT;
         s_audio_stop = true;
-        if (!bsp_lvgl_lock(500)) return;
-        destroy_screen();
-        bsp_lvgl_unlock();
+        enter_silent_screen();
     }
-    // 走失模式：上键播放一次语音
     if (btn == BSP_BTN_UP && (s_state == STATE_MILD_LOST || s_state == STATE_SEVERE_LOST)) {
         if (bsp_lvgl_lock(500)) { ui_pixel_mascot_jump(s_mascot); bsp_lvgl_unlock(); }
         play_wav(90);
