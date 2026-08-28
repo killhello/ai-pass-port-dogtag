@@ -13,5 +13,5 @@ idf_component_register(
          "font_cn_20.c"
     INCLUDE_DIRS "."
     EMBED_FILES "dogtag_help.wav"
-    REQUIRES bsp bt cjson esp_event esp_hw_support esp_http_server esp_netif esp_timer esp_wifi nvs_flash
+    REQUIRES bsp bt cJSON esp_event esp_hw_support esp_http_server esp_netif esp_timer esp_wifi nvs_flash
 )
