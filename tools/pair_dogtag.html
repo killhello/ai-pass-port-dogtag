@@ -88,7 +88,7 @@ async function pair() {
 
     setStatus('步骤 5/5：发送配对完成指令');
     const cmdChar = await service.getCharacteristic(CMD_UUID);
-    await cmdChar.writeValueWithoutResponse(new Uint8Array([0x01]));
+    await cmdChar.writeValue(new Uint8Array([0x01]));
 
     setStatus('完成');
     show(`配对成功！<br>姓名：${name}<br>电话：${phone}`, 'ok');
