@@ -139,6 +139,8 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
                 ESP_LOGI(TAG, "pair complete");
                 dogtag_state_set_owner_valid(true);
                 dogtag_state_save_nvs();
+                dogtag_state_set_state(DOGTAG_STATE_SILENT);
+                dogtag_ui_enter_silent();
             } else if (cmd == CMD_FIND_ME && dogtag_state_get_state() == DOGTAG_STATE_SEVERE_LOST) {
                 dogtag_audio_find_me_request();
             }
