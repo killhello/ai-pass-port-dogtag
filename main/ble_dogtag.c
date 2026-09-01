@@ -218,12 +218,8 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
             dogtag_ui_enter_silent();
             advertise();
         } else if (dogtag_state_get_state() == DOGTAG_STATE_SILENT && dogtag_state_is_owner_valid()) {
-            ESP_LOGI(TAG, "-> DEBOUNCE");
-            dogtag_state_set_state(DOGTAG_STATE_DEBOUNCE);
-            dogtag_audio_stop();
-            dogtag_ui_enter_lost();
+            ESP_LOGI(TAG, "-> SILENT (keep advertising)");
             advertise();
-            dogtag_state_start_debounce_timer();
         } else {
             advertise();
         }

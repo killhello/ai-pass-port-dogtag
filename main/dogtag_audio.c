@@ -48,7 +48,7 @@ static void play_wav(int volume) {
 static void play_beep(void) {
     if (s_audio_stop) return;
     bsp_audio_set_format(8000, 16, 1);
-    bsp_audio_set_volume(30);
+    bsp_audio_set_volume(100);
     int16_t buf[800];
     for (int i = 0; i < 800; i++)
         buf[i] = ((i % 8) < 4) ? 3000 : -3000;
