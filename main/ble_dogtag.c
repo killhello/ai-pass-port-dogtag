@@ -45,6 +45,26 @@ static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static bool s_advertising;
 static int8_t s_rssi = -127;
 static TimerHandle_t s_rssi_tmr;
+static TaskHandle_t s_defer_task;
+
+static void defer_pair_complete(void *arg) {
+    (void)arg;
+    ESP_LOGI(TAG, "deferred: pair complete -> SILENT");
+    dogtag_state_set_state(DOGTAG_STATE_SILENT);
+    dogtag_ui_enter_silent();
+    s_defer_task = NULL;
+    vTaskDelete(NULL);
+}
+
+static void defer_reconnect(void *arg) {
+    (void)arg;
+    ESP_LOGI(TAG, "deferred: reconnected -> SILENT");
+    dogtag_state_set_state(DOGTAG_STATE_SILENT);
+    dogtag_audio_stop();
+    dogtag_ui_enter_silent();
+    s_defer_task = NULL;
+    vTaskDelete(NULL);
+}
 
 static void rssi_poll_cb(TimerHandle_t t) {
     (void)t;
@@ -139,8 +159,9 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
                 ESP_LOGI(TAG, "pair complete");
                 dogtag_state_set_owner_valid(true);
                 dogtag_state_save_nvs();
-                dogtag_state_set_state(DOGTAG_STATE_SILENT);
-                dogtag_ui_enter_silent();
+                if (!s_defer_task) {
+                    xTaskCreate(defer_pair_complete, "defer_pair", 4096, NULL, 5, &s_defer_task);
+                }
             } else if (cmd == CMD_FIND_ME) {
                 ESP_LOGI(TAG, "find me request");
                 dogtag_audio_find_me_request();
@@ -200,9 +221,9 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
                 dogtag_state_get_state() == DOGTAG_STATE_MILD_LOST ||
                 dogtag_state_get_state() == DOGTAG_STATE_SEVERE_LOST) {
                 ESP_LOGI(TAG, "reconnected -> SILENT");
-                dogtag_state_set_state(DOGTAG_STATE_SILENT);
-                dogtag_audio_stop();
-                dogtag_ui_enter_silent();
+                if (!s_defer_task) {
+                    xTaskCreate(defer_reconnect, "defer_recon", 4096, NULL, 5, &s_defer_task);
+                }
             }
         } else {
             ESP_LOGW(TAG, "connect failed: %d", ev->connect.status);
