@@ -53,7 +53,7 @@ static void rssi_poll_cb(TimerHandle_t t) {
         return;
     }
     int8_t rssi;
-    int rc = ble_gap_conn_get_rssi(s_conn_handle, &rssi);
+    int rc = ble_gap_conn_rssi(s_conn_handle, &rssi);
     if (rc == 0) {
         s_rssi = rssi;
         dogtag_ui_update_rssi(s_rssi);
@@ -278,8 +278,6 @@ esp_err_t ble_dogtag_init(void) {
 
     if (!s_rssi_tmr) {
         s_rssi_tmr = xTimerCreate("rssi", pdMS_TO_TICKS(1000), pdTRUE, NULL, rssi_poll_cb);
-    }
-        return ESP_ERR_NO_MEM;
     }
 
     ble_svc_gap_init();
