@@ -78,6 +78,18 @@ void dogtag_ui_enter_silent(void) {
     lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_LEFT, 6, 26);
     lv_label_set_text(s_lbl_soc, "BLE");
 
+    s_lbl_name = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
+    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_LEFT, 6, 50);
+    lv_label_set_text_fmt(s_lbl_name, "%s", dogtag_state_get_owner_name());
+
+    s_lbl_phone = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
+    lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_INK), 0);
+    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_LEFT, 6, 74);
+    lv_label_set_text_fmt(s_lbl_phone, "%s", dogtag_state_get_owner_phone());
+
     s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
