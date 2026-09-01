@@ -23,6 +23,7 @@ static void wifi_config_cb(const char *name, const char *phone) {
 void demo_dogtag_enter(void) {
     ESP_LOGI(TAG, "enter");
 
+    dogtag_state_init();
     dogtag_state_load_nvs();
 
     if (dogtag_state_is_owner_valid()) {
@@ -35,7 +36,6 @@ void demo_dogtag_enter(void) {
         ESP_LOGI(TAG, "no owner -> pairing");
     }
 
-    dogtag_state_init();
     dogtag_ui_init();
     dogtag_audio_init();
 
