@@ -17,6 +17,8 @@ button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size
 .btn-pair { background: #e94560; color: #fff; }
 .btn-pair:hover { background: #c73a52; }
 .btn-pair:disabled { background: #555; cursor: not-allowed; }
+.btn-disconnect { background: #555; color: #fff; margin-top: 12px; display: none; }
+.btn-disconnect:hover { background: #333; }
 .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
 .msg.ok { display: block; background: #1b4332; color: #95d5b2; }
 .msg.err { display: block; background: #3d0814; color: #ff6b6b; }
@@ -33,6 +35,7 @@ button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size
   <label>联系电话</label>
   <input type="tel" id="phone" placeholder="请输入电话号码">
   <button class="btn-pair" id="btn" onclick="pair()">开始配对</button>
+  <button class="btn-disconnect" id="btnDisc" onclick="disconnect()">断开连接</button>
   <div class="msg" id="msg"></div>
   <p id="status"></p>
 </div>
@@ -42,6 +45,8 @@ const SVC_UUID  = 'f0debc9a-7856-3412-1234-567812345678';
 const NAME_UUID = 'f1debc9a-7856-3412-1234-567812345678';
 const PHONE_UUID= 'f2debc9a-7856-3412-1234-567812345678';
 const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
+
+let g_device = null;
 
 function show(text, type='info') {
   const el = document.getElementById('msg');
@@ -53,6 +58,21 @@ function setStatus(text) {
   document.getElementById('status').textContent = text;
 }
 
+function disconnect() {
+  if (g_device && g_device.gatt.connected) {
+    g_device.gatt.disconnect();
+  }
+  onDisconnected();
+}
+
+function onDisconnected() {
+  g_device = null;
+  document.getElementById('btn').disabled = false;
+  document.getElementById('btnDisc').style.display = 'none';
+  setStatus('已断开');
+  show('连接已断开', 'info');
+}
+
 async function pair() {
   const name = document.getElementById('name').value.trim();
   const phone = document.getElementById('phone').value.trim();
@@ -61,19 +81,20 @@ async function pair() {
 
   const btn = document.getElementById('btn');
   btn.disabled = true;
-  let device = null;
 
   try {
     setStatus('步骤 1/5：搜索设备');
     show('正在搜索 DogTag 设备...', 'info');
-    device = await navigator.bluetooth.requestDevice({
+    g_device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'DogTag' }],
       optionalServices: [SVC_UUID]
     });
 
+    g_device.addEventListener('gattserverdisconnected', onDisconnected);
+
     setStatus('步骤 2/5：连接 GATT');
     show('正在连接...', 'info');
-    const server = await device.gatt.connect();
+    const server = await g_device.gatt.connect();
 
     setStatus('步骤 3/5：获取服务');
     const service = await server.getPrimaryService(SVC_UUID);
@@ -90,19 +111,15 @@ async function pair() {
     const cmdChar = await service.getCharacteristic(CMD_UUID);
     await cmdChar.writeValue(new Uint8Array([0x01]));
 
-    setStatus('完成');
-    show(`配对成功！<br>姓名：${name}<br>电话：${phone}`, 'ok');
+    setStatus('已连接');
+    show(`配对成功！保持连接中...<br>姓名：${name}<br>电话：${phone}<br><small>走远可观察信号强度变化</small>`, 'ok');
+    document.getElementById('btnDisc').style.display = 'block';
   } catch (e) {
     if (e.name !== 'NotFoundError') {
       show('配对失败: ' + e.message + '<br><small>' + (e.name || '') + '</small>', 'err');
       setStatus('失败');
     } else {
       setStatus('已取消');
-    }
-  } finally {
-    await new Promise(r => setTimeout(r, 500));
-    if (device && device.gatt.connected) {
-      try { device.gatt.disconnect(); } catch(e) {}
     }
     btn.disabled = false;
   }
