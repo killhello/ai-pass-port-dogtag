@@ -59,7 +59,7 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {{
         { .uuid = &chr_name_uuid.u,  .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { .uuid = &chr_phone_uuid.u, .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { .uuid = &chr_batt_uuid.u,  .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ },
-        { .uuid = &chr_cmd_uuid.u,   .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NR },
+        { .uuid = &chr_cmd_uuid.u,   .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_WRITE },
         { 0 },
     },
 }, { 0 }};
