@@ -17,6 +17,7 @@
 #include "nimble/nimble_port_freertos.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "services/ble/ble_svc_store.h"
 #include <string.h>
 
 static const char *TAG = "ble_dogtag";
@@ -45,6 +46,9 @@ static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static bool s_advertising;
 static int8_t s_rssi = -127;
 static TimerHandle_t s_rssi_tmr;
+
+#define BOND_NVS_NAMESPACE "ble_bond"
+#define BOND_KEY_MAX 64
 
 static void rssi_poll_cb(TimerHandle_t t) {
     (void)t;
@@ -293,6 +297,14 @@ esp_err_t ble_dogtag_init(void) {
     ble_hs_cfg.reset_cb = on_reset;
     ble_hs_cfg.sync_cb = on_sync;
 
+    ble_hs_cfg.store_read_cb = store_read;
+    ble_hs_cfg.store_write_cb = store_write;
+    ble_hs_cfg.store_delete_cb = store_delete;
+
+    ble_hs_cfg.sm_bonding = 1;
+    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.sm_sc = 1;
+
     rc = ble_gatts_count_cfg(gatt_svcs);
     if (rc != 0) {
         ESP_LOGE(TAG, "gatts count cfg failed: %d", rc);
@@ -383,4 +395,41 @@ void ble_dogtag_clear_owner(void) {
 
 int8_t ble_dogtag_get_rssi(void) {
     return s_rssi;
+}
+
+static int store_read(int obj_type, const void *obj_key, int obj_key_len,
+                       void *out_data, int out_data_len, int *out_len) {
+    nvs_handle_t h;
+    if (nvs_open(BOND_NVS_NAMESPACE, NVS_READONLY, &h) != ESP_OK) return BLE_HS_ENOENT;
+    char key[32];
+    snprintf(key, sizeof(key), "%d_%d", obj_type, obj_key_len);
+    size_t len = out_data_len;
+    esp_err_t err = nvs_get_blob(h, key, out_data, &len);
+    nvs_close(h);
+    if (err != ESP_OK) return BLE_HS_ENOENT;
+    *out_len = len;
+    return 0;
+}
+
+static int store_write(int obj_type, const void *obj_key, int obj_key_len,
+                        const void *val, int val_len) {
+    nvs_handle_t h;
+    if (nvs_open(BOND_NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return BLE_HS_EOS;
+    char key[32];
+    snprintf(key, sizeof(key), "%d_%d", obj_type, obj_key_len);
+    esp_err_t err = nvs_set_blob(h, key, val, val_len);
+    if (err == ESP_OK) nvs_commit(h);
+    nvs_close(h);
+    return (err == ESP_OK) ? 0 : BLE_HS_EOS;
+}
+
+static int store_delete(int obj_type, const void *obj_key, int obj_key_len) {
+    nvs_handle_t h;
+    if (nvs_open(BOND_NVS_NAMESPACE, NVS_READWRITE, &h) != ESP_OK) return BLE_HS_ENOENT;
+    char key[32];
+    snprintf(key, sizeof(key), "%d_%d", obj_type, obj_key_len);
+    nvs_erase_all(h, key);
+    nvs_commit(h);
+    nvs_close(h);
+    return 0;
 }
