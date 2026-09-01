@@ -17,6 +17,8 @@ button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size
 .btn-pair { background: #e94560; color: #fff; }
 .btn-pair:hover { background: #c73a52; }
 .btn-pair:disabled { background: #555; cursor: not-allowed; }
+.btn-find { background: #27ae60; color: #fff; margin-top: 12px; display: none; }
+.btn-find:hover { background: #1e8449; }
 .btn-disconnect { background: #555; color: #fff; margin-top: 12px; display: none; }
 .btn-disconnect:hover { background: #333; }
 .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
@@ -35,6 +37,7 @@ button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size
   <label>联系电话</label>
   <input type="tel" id="phone" placeholder="请输入电话号码">
   <button class="btn-pair" id="btn" onclick="pair()">开始配对</button>
+  <button class="btn-find" id="btnFind" onclick="findDevice()">查找设备</button>
   <button class="btn-disconnect" id="btnDisc" onclick="disconnect()">断开连接</button>
   <div class="msg" id="msg"></div>
   <p id="status"></p>
@@ -47,6 +50,7 @@ const PHONE_UUID= 'f2debc9a-7856-3412-1234-567812345678';
 const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
 
 let g_device = null;
+let g_cmdChar = null;
 
 function show(text, type='info') {
   const el = document.getElementById('msg');
@@ -67,10 +71,22 @@ function disconnect() {
 
 function onDisconnected() {
   g_device = null;
+  g_cmdChar = null;
   document.getElementById('btn').disabled = false;
+  document.getElementById('btnFind').style.display = 'none';
   document.getElementById('btnDisc').style.display = 'none';
   setStatus('已断开');
   show('连接已断开', 'info');
+}
+
+async function findDevice() {
+  if (!g_cmdChar) { show('未连接', 'err'); return; }
+  try {
+    await g_cmdChar.writeValue(new Uint8Array([0x02]));
+    show('已发送查找指令', 'ok');
+  } catch (e) {
+    show('发送失败: ' + e.message, 'err');
+  }
 }
 
 async function pair() {
@@ -108,11 +124,12 @@ async function pair() {
     await phoneChar.writeValue(new TextEncoder().encode(phone));
 
     setStatus('步骤 5/5：发送配对完成指令');
-    const cmdChar = await service.getCharacteristic(CMD_UUID);
-    await cmdChar.writeValue(new Uint8Array([0x01]));
+    g_cmdChar = await service.getCharacteristic(CMD_UUID);
+    await g_cmdChar.writeValue(new Uint8Array([0x01]));
 
     setStatus('已连接');
-    show(`配对成功！保持连接中...<br>姓名：${name}<br>电话：${phone}<br><small>走远可观察信号强度变化</small>`, 'ok');
+    show(`配对成功！保持连接中...<br>姓名：${name}<br>电话：${phone}<br><small>点击"查找设备"让狗牌响铃</small>`, 'ok');
+    document.getElementById('btnFind').style.display = 'block';
     document.getElementById('btnDisc').style.display = 'block';
   } catch (e) {
     if (e.name !== 'NotFoundError') {
