@@ -35,6 +35,7 @@ const char *ble_dogtag_get_owner_phone(void);
 bool ble_dogtag_is_owner_valid(void);
 void ble_dogtag_set_owner(const char *name, const char *phone);
 void ble_dogtag_clear_owner(void);
+int8_t ble_dogtag_get_rssi(void);
 
 #ifdef __cplusplus
 }

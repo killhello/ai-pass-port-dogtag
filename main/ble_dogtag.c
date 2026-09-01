@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "freertos/timers.h"
 #include "host/ble_gap.h"
 #include "host/ble_hs.h"
 #include "host/util/util.h"
@@ -42,6 +43,22 @@ static bool s_start_requested;
 static uint8_t s_addr_type;
 static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static bool s_advertising;
+static int8_t s_rssi = -127;
+static TimerHandle_t s_rssi_tmr;
+
+static void rssi_poll_cb(TimerHandle_t t) {
+    (void)t;
+    if (s_conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        s_rssi = -127;
+        return;
+    }
+    int8_t rssi;
+    int rc = ble_gap_conn_get_rssi(s_conn_handle, &rssi);
+    if (rc == 0) {
+        s_rssi = rssi;
+        dogtag_ui_update_rssi(s_rssi);
+    }
+}
 
 static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt *ctx, void *arg);
 static int gap_event(struct ble_gap_event *ev, void *arg);
@@ -175,6 +192,7 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
             ESP_LOGI(TAG, "BLE connected");
             s_conn_handle = ev->connect.conn_handle;
             adv_stop();
+            xTimerStart(s_rssi_tmr, 0);
             if (dogtag_state_get_state() == DOGTAG_STATE_DEBOUNCE ||
                 dogtag_state_get_state() == DOGTAG_STATE_MILD_LOST ||
                 dogtag_state_get_state() == DOGTAG_STATE_SEVERE_LOST) {
@@ -189,6 +207,9 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
     } else if (ev->type == BLE_GAP_EVENT_DISCONNECT) {
         ESP_LOGI(TAG, "BLE disconnected, reason=%d", ev->disconnect.reason);
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        s_rssi = -127;
+        xTimerStop(s_rssi_tmr, 0);
+        dogtag_ui_update_rssi(-127);
         if (dogtag_state_get_state() == DOGTAG_STATE_PAIRING && dogtag_state_is_owner_valid()) {
             ESP_LOGI(TAG, "pair done -> SILENT");
             dogtag_state_set_state(DOGTAG_STATE_SILENT);
@@ -252,6 +273,12 @@ esp_err_t ble_dogtag_init(void) {
     if (!s_host_stopped) {
         nimble_port_deinit();
         s_initialized = false;
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (!s_rssi_tmr) {
+        s_rssi_tmr = xTimerCreate("rssi", pdMS_TO_TICKS(1000), pdTRUE, NULL, rssi_poll_cb);
+    }
         return ESP_ERR_NO_MEM;
     }
 
@@ -355,4 +382,8 @@ void ble_dogtag_set_owner(const char *name, const char *phone) {
 
 void ble_dogtag_clear_owner(void) {
     dogtag_state_clear_owner();
+}
+
+int8_t ble_dogtag_get_rssi(void) {
+    return s_rssi;
 }

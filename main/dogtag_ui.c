@@ -14,6 +14,7 @@ static lv_obj_t *s_scr;
 static lv_obj_t *s_panel;
 static lv_obj_t *s_lbl_title;
 static lv_obj_t *s_lbl_soc;
+static lv_obj_t *s_lbl_rssi;
 static lv_obj_t *s_lbl_name;
 static lv_obj_t *s_lbl_phone;
 static lv_obj_t *s_lbl_sos;
@@ -26,12 +27,12 @@ static void destroy_screen(void) {
         lv_obj_delete(s_scr);
         s_scr = NULL;
     }
-    s_panel = s_lbl_title = s_lbl_soc = s_lbl_name = NULL;
+    s_panel = s_lbl_title = s_lbl_soc = s_lbl_rssi = s_lbl_name = NULL;
     s_lbl_phone = s_lbl_sos = s_lbl_cd = s_mascot = NULL;
 }
 
 void dogtag_ui_init(void) {
-    s_scr = s_panel = s_lbl_title = s_lbl_soc = NULL;
+    s_scr = s_panel = s_lbl_title = s_lbl_soc = s_lbl_rssi = NULL;
     s_lbl_name = s_lbl_phone = s_lbl_sos = s_lbl_cd = s_mascot = NULL;
     s_ui_tmr = NULL;
 }
@@ -72,11 +73,11 @@ void dogtag_ui_enter_silent(void) {
     lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 4);
     lv_label_set_text(s_lbl_title, "DOG TAG");
 
-    s_lbl_soc = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_soc, &font_cn_16, 0);
-    lv_obj_set_style_text_color(s_lbl_soc, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_LEFT, 6, 26);
-    lv_label_set_text(s_lbl_soc, "BLE");
+    s_lbl_rssi = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_rssi, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_rssi, lv_color_hex(UI_RED), 0);
+    lv_obj_align(s_lbl_rssi, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_label_set_text(s_lbl_rssi, "0");
 
     s_lbl_name = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
@@ -152,6 +153,19 @@ void dogtag_ui_update_battery(int soc) {
     if (!s_lbl_soc) return;
     if (!bsp_lvgl_lock(100)) return;
     lv_label_set_text_fmt(s_lbl_soc, "%d%%", soc);
+    bsp_lvgl_unlock();
+}
+
+void dogtag_ui_update_rssi(int8_t rssi) {
+    if (!s_lbl_rssi) return;
+    if (!bsp_lvgl_lock(100)) return;
+    if (rssi <= -127) {
+        lv_label_set_text(s_lbl_rssi, "0");
+        lv_obj_set_style_text_color(s_lbl_rssi, lv_color_hex(UI_RED), 0);
+    } else {
+        lv_label_set_text_fmt(s_lbl_rssi, "%d", rssi);
+        lv_obj_set_style_text_color(s_lbl_rssi, lv_color_hex(UI_GRASS), 0);
+    }
     bsp_lvgl_unlock();
 }
 

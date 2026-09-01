@@ -15,6 +15,7 @@ void dogtag_ui_enter_silent(void);
 void dogtag_ui_enter_lost(void);
 void dogtag_ui_update_flash(bool flash_on);
 void dogtag_ui_update_battery(int soc);
+void dogtag_ui_update_rssi(int8_t rssi);
 void dogtag_ui_update_countdown(int seconds);
 
 bool dogtag_ui_lock(void);
