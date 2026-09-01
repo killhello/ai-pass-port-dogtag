@@ -45,8 +45,12 @@ const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
 
 function show(text, type='info') {
   const el = document.getElementById('msg');
-  el.textContent = text;
+  el.innerHTML = text;
   el.className = 'msg ' + type;
+}
+
+function setStatus(text) {
+  document.getElementById('status').textContent = text;
 }
 
 async function pair() {
@@ -57,18 +61,24 @@ async function pair() {
 
   const btn = document.getElementById('btn');
   btn.disabled = true;
-  show('正在搜索 DogTag 设备...', 'info');
+  let device = null;
 
   try {
-    const device = await navigator.bluetooth.requestDevice({
+    setStatus('步骤 1/5：搜索设备');
+    show('正在搜索 DogTag 设备...', 'info');
+    device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'DogTag' }],
-      optionalServices: [SVC_UUID, NAME_UUID, PHONE_UUID, CMD_UUID]
+      optionalServices: [SVC_UUID]
     });
 
+    setStatus('步骤 2/5：连接 GATT');
     show('正在连接...', 'info');
     const server = await device.gatt.connect();
+
+    setStatus('步骤 3/5：获取服务');
     const service = await server.getPrimaryService(SVC_UUID);
 
+    setStatus('步骤 4/5：写入信息');
     show('正在写入信息...', 'info');
     const nameChar = await service.getCharacteristic(NAME_UUID);
     await nameChar.writeValue(new TextEncoder().encode(name));
@@ -76,13 +86,24 @@ async function pair() {
     const phoneChar = await service.getCharacteristic(PHONE_UUID);
     await phoneChar.writeValue(new TextEncoder().encode(phone));
 
+    setStatus('步骤 5/5：发送配对完成指令');
     const cmdChar = await service.getCharacteristic(CMD_UUID);
-    await cmdChar.writeValue(new Uint8Array([0x01]));
+    await cmdChar.writeValueWithoutResponse(new Uint8Array([0x01]));
 
+    setStatus('完成');
     show(`配对成功！<br>姓名：${name}<br>电话：${phone}`, 'ok');
   } catch (e) {
-    if (e.name !== 'NotFoundError') show('配对失败: ' + e.message, 'err');
+    if (e.name !== 'NotFoundError') {
+      show('配对失败: ' + e.message + '<br><small>' + (e.name || '') + '</small>', 'err');
+      setStatus('失败');
+    } else {
+      setStatus('已取消');
+    }
   } finally {
+    await new Promise(r => setTimeout(r, 500));
+    if (device && device.gatt.connected) {
+      try { device.gatt.disconnect(); } catch(e) {}
+    }
     btn.disabled = false;
   }
 }

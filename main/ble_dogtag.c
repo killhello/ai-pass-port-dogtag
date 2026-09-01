@@ -50,6 +50,7 @@ static void adv_stop(void);
 static void on_reset(int reason);
 static void on_sync(void);
 static void host_task(void *arg);
+static void disconnect_delayed_task(void *arg);
 
 static const struct ble_gatt_svc_def gatt_svcs[] = {{
     .type = BLE_GATT_SVC_TYPE_PRIMARY,
@@ -58,7 +59,7 @@ static const struct ble_gatt_svc_def gatt_svcs[] = {{
         { .uuid = &chr_name_uuid.u,  .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { .uuid = &chr_phone_uuid.u, .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE },
         { .uuid = &chr_batt_uuid.u,  .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_READ },
-        { .uuid = &chr_cmd_uuid.u,   .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_WRITE },
+        { .uuid = &chr_cmd_uuid.u,   .access_cb = gatt_access, .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NR },
         { 0 },
     },
 }, { 0 }};
@@ -122,7 +123,8 @@ static int gatt_access(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
                 ESP_LOGI(TAG, "pair complete");
                 dogtag_state_set_owner_valid(true);
                 dogtag_state_save_nvs();
-                ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
+                /* 延迟断开，确保 Write Response 已发出，避免客户端 GATT 操作失败 */
+                xTaskCreate(disconnect_delayed_task, "disc_delay", 4096, NULL, 5, NULL);
             } else if (cmd == CMD_FIND_ME && dogtag_state_get_state() == DOGTAG_STATE_SEVERE_LOST) {
                 dogtag_audio_find_me_request();
             }
@@ -169,6 +171,17 @@ static void adv_stop(void) {
     }
 }
 
+static void disconnect_delayed_task(void *arg) {
+    (void)arg;
+    /* 等待 Write Response 发送完成后再断开 */
+    vTaskDelay(pdMS_TO_TICKS(300));
+    if (s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        ESP_LOGI(TAG, "delayed disconnect");
+        ble_gap_terminate(s_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+    }
+    vTaskDelete(NULL);
+}
+
 static int gap_event(struct ble_gap_event *ev, void *arg) {
     (void)arg;
     if (ev->type == BLE_GAP_EVENT_CONNECT) {
@@ -190,7 +203,12 @@ static int gap_event(struct ble_gap_event *ev, void *arg) {
     } else if (ev->type == BLE_GAP_EVENT_DISCONNECT) {
         ESP_LOGI(TAG, "BLE disconnected, reason=%d", ev->disconnect.reason);
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-        if (dogtag_state_get_state() == DOGTAG_STATE_SILENT && dogtag_state_is_owner_valid()) {
+        if (dogtag_state_get_state() == DOGTAG_STATE_PAIRING && dogtag_state_is_owner_valid()) {
+            ESP_LOGI(TAG, "pair done -> SILENT");
+            dogtag_state_set_state(DOGTAG_STATE_SILENT);
+            dogtag_ui_enter_silent();
+            advertise();
+        } else if (dogtag_state_get_state() == DOGTAG_STATE_SILENT && dogtag_state_is_owner_valid()) {
             ESP_LOGI(TAG, "-> DEBOUNCE");
             dogtag_state_set_state(DOGTAG_STATE_DEBOUNCE);
             dogtag_audio_stop();
