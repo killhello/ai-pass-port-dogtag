@@ -47,16 +47,34 @@ void dogtag_ui_deinit(void) {
 void dogtag_ui_enter_pairing(void) {
     if (!bsp_lvgl_lock(500)) return;
     destroy_screen();
-    s_scr = ui_pixel_screen_create("DOG TAG");
-    lv_obj_t *panel = ui_pixel_panel_create(s_scr, 22, 58, 196, 180, UI_PAPER);
-    s_lbl_sos = lv_label_create(panel);
-    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_16, 0);
-    lv_obj_set_width(s_lbl_sos, 168);
+    s_scr = ui_pixel_screen_create("");
+
+    lv_obj_set_style_bg_color(s_scr, lv_color_hex(UI_TEAL), 0);
+
+    s_lbl_title = lv_label_create(s_scr);
+    lv_obj_set_style_text_font(s_lbl_title, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_WHITE), 0);
+    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 20);
+    lv_label_set_text(s_lbl_title, "电子狗牌");
+
+    lv_obj_t *sub = lv_label_create(s_scr);
+    lv_obj_set_style_text_font(sub, &font_cn_16, 0);
+    lv_obj_set_style_text_color(sub, lv_color_hex(UI_WHITE), 0);
+    lv_obj_set_style_text_opa(sub, LV_OPA_70, 0);
+    lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 44);
+    lv_label_set_text(sub, "智能防走失");
+
+    s_panel = ui_pixel_panel_create(s_scr, 20, 80, 200, 160, UI_WHITE);
+
+    s_lbl_sos = lv_label_create(s_panel);
+    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_20, 0);
+    lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_TEAL), 0);
+    lv_obj_set_width(s_lbl_sos, 180);
     lv_obj_set_style_text_align(s_lbl_sos, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_INK), 0);
     lv_obj_center(s_lbl_sos);
-    lv_label_set_text(s_lbl_sos, "\n\n配对模式\n\n请扫描蓝牙\n设置主人信息");
-    s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
+    lv_label_set_text(s_lbl_sos, "配对模式\n\n请扫描蓝牙\n设置主人信息");
+
+    s_mascot = ui_pixel_mascot_create(s_scr, 101, 250);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
 }
@@ -64,38 +82,48 @@ void dogtag_ui_enter_pairing(void) {
 void dogtag_ui_enter_silent(void) {
     if (!bsp_lvgl_lock(500)) return;
     destroy_screen();
-    s_scr = ui_pixel_screen_create("DOG TAG");
-    s_panel = ui_pixel_panel_create(s_scr, 18, 54, 204, 190, UI_PAPER);
+    s_scr = ui_pixel_screen_create("");
 
-    s_lbl_title = lv_label_create(s_panel);
+    lv_obj_set_style_bg_color(s_scr, lv_color_hex(UI_TEAL), 0);
+
+    s_lbl_title = lv_label_create(s_scr);
     lv_obj_set_style_text_font(s_lbl_title, &font_cn_16, 0);
-    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 4);
-    lv_label_set_text(s_lbl_title, "DOG TAG");
+    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_WHITE), 0);
+    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 20);
+    lv_label_set_text(s_lbl_title, "电子狗牌");
+
+    lv_obj_t *sub = lv_label_create(s_scr);
+    lv_obj_set_style_text_font(sub, &font_cn_16, 0);
+    lv_obj_set_style_text_color(sub, lv_color_hex(UI_WHITE), 0);
+    lv_obj_set_style_text_opa(sub, LV_OPA_70, 0);
+    lv_obj_align(sub, LV_ALIGN_TOP_MID, 0, 44);
+    lv_label_set_text(sub, "已连接");
+
+    s_panel = ui_pixel_panel_create(s_scr, 20, 70, 200, 180, UI_WHITE);
 
     s_lbl_rssi = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_rssi, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_rssi, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_rssi, LV_ALIGN_TOP_MID, 0, 26);
+    lv_obj_align(s_lbl_rssi, LV_ALIGN_TOP_MID, 0, 8);
     lv_label_set_text(s_lbl_rssi, "0");
 
     s_lbl_name = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
+    lv_obj_set_style_text_font(s_lbl_name, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
-    lv_obj_set_width(s_lbl_name, 190);
+    lv_obj_set_width(s_lbl_name, 180);
     lv_obj_set_style_text_align(s_lbl_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 50);
+    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 40);
     lv_label_set_text_fmt(s_lbl_name, "%s", dogtag_state_get_owner_name());
 
     s_lbl_phone = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
-    lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_INK), 0);
-    lv_obj_set_width(s_lbl_phone, 190);
+    lv_obj_set_style_text_font(s_lbl_phone, &font_cn_16, 0);
+    lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_TEAL), 0);
+    lv_obj_set_width(s_lbl_phone, 180);
     lv_obj_set_style_text_align(s_lbl_phone, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 74);
+    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 80);
     lv_label_set_text_fmt(s_lbl_phone, "%s", dogtag_state_get_owner_phone());
 
-    s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
+    s_mascot = ui_pixel_mascot_create(s_scr, 101, 256);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
 }
@@ -103,48 +131,52 @@ void dogtag_ui_enter_silent(void) {
 void dogtag_ui_enter_lost(void) {
     if (!bsp_lvgl_lock(500)) return;
     destroy_screen();
-    s_scr = ui_pixel_screen_create("DOG TAG");
-    s_panel = ui_pixel_panel_create(s_scr, 18, 54, 204, 190, UI_PAPER);
+    s_scr = ui_pixel_screen_create("");
 
-    s_lbl_title = lv_label_create(s_panel);
+    lv_obj_set_style_bg_color(s_scr, lv_color_hex(UI_RED), 0);
+
+    s_lbl_title = lv_label_create(s_scr);
     lv_obj_set_style_text_font(s_lbl_title, &font_cn_16, 0);
-    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 4);
-    lv_label_set_text(s_lbl_title, "DOG TAG");
+    lv_obj_set_style_text_color(s_lbl_title, lv_color_hex(UI_WHITE), 0);
+    lv_obj_align(s_lbl_title, LV_ALIGN_TOP_MID, 0, 20);
+    lv_label_set_text(s_lbl_title, "电子狗牌");
+
+    s_lbl_cd = lv_label_create(s_scr);
+    lv_obj_set_style_text_font(s_lbl_cd, &font_cn_20, 0);
+    lv_obj_set_style_text_color(s_lbl_cd, lv_color_hex(UI_WHITE), 0);
+    lv_obj_align(s_lbl_cd, LV_ALIGN_TOP_MID, 0, 44);
+    lv_label_set_text(s_lbl_cd, "0:00");
+
+    s_panel = ui_pixel_panel_create(s_scr, 20, 80, 200, 160, UI_WHITE);
 
     s_lbl_soc = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_soc, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_soc, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_MID, 0, 26);
-
-    s_lbl_cd = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_cd, &font_cn_16, 0);
-    lv_obj_set_style_text_color(s_lbl_cd, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_cd, LV_ALIGN_TOP_MID, 0, 46);
+    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_MID, 0, 8);
 
     s_lbl_name = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
-    lv_obj_set_width(s_lbl_name, 190);
+    lv_obj_set_width(s_lbl_name, 180);
     lv_obj_set_style_text_align(s_lbl_name, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 70);
-    lv_label_set_text_fmt(s_lbl_name, "姓名: %s", dogtag_state_get_owner_name());
+    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 40);
+    lv_label_set_text_fmt(s_lbl_name, "%s", dogtag_state_get_owner_name());
 
     s_lbl_phone = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_RED), 0);
-    lv_obj_set_width(s_lbl_phone, 190);
+    lv_obj_set_width(s_lbl_phone, 180);
     lv_obj_set_style_text_align(s_lbl_phone, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 94);
-    lv_label_set_text_fmt(s_lbl_phone, "电话: %s", dogtag_state_get_owner_phone());
+    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 70);
+    lv_label_set_text_fmt(s_lbl_phone, "%s", dogtag_state_get_owner_phone());
 
     s_lbl_sos = lv_label_create(s_panel);
-    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_16, 0);
+    lv_obj_set_style_text_font(s_lbl_sos, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_sos, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_sos, LV_ALIGN_TOP_MID, 0, 128);
+    lv_obj_align(s_lbl_sos, LV_ALIGN_TOP_MID, 0, 110);
     lv_label_set_text(s_lbl_sos, "SOS");
 
-    s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
+    s_mascot = ui_pixel_mascot_create(s_scr, 101, 246);
     lv_screen_load(s_scr);
     bsp_lvgl_unlock();
 }
