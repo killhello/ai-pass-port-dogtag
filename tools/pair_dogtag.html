@@ -23,13 +23,20 @@ button:disabled { background: #94A3B8; cursor: not-allowed; }
 .btn-find:active { background: #059669; }
 .btn-disc { background: #64748B; }
 .btn-disc:active { background: #475569; }
-.btn-exit { background: #EF4444; }
-.btn-exit:active { background: #DC2626; }
+.btn-del { background: #EF4444; padding: 6px 12px; font-size: .75rem; width: auto; }
+.btn-del:active { background: #DC2626; }
 #status { text-align: center; padding: 8px; color: #0D9488; font-size: .85rem; }
 .paw { font-size: 2rem; text-align: center; margin: 8px; }
 .info { text-align: center; padding: 12px; background: #F0FDFA; border-radius: 8px; margin: 8px 0; }
 .info p { font-size: .85rem; color: #64748B; margin: 4px 0; }
 .info .val { font-size: 1.1rem; color: #1E293B; font-weight: bold; }
+.history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px; margin: 6px 0; cursor: pointer; transition: .15s; }
+.history-item:hover { border-color: #0D9488; background: #F0FDFA; }
+.history-item .info { flex: 1; text-align: left; background: none; padding: 0; margin: 0; border-radius: 0; }
+.history-item .info p { margin: 0; }
+.history-item .info .name { font-size: .95rem; color: #1E293B; font-weight: bold; }
+.history-item .info .phone { font-size: .8rem; color: #64748B; }
+.empty { text-align: center; color: #94A3B8; font-size: .85rem; padding: 16px; }
 </style>
 </head>
 <body>
@@ -62,7 +69,11 @@ button:disabled { background: #94A3B8; cursor: not-allowed; }
     <button class="btn-disc" onclick="disconnect()">断开连接</button>
   </div>
 
-  <button class="btn-exit" onclick="location.reload()" style="margin-top:16px">重新配对</button>
+  <div class="card" id="historyCard">
+    <h2>📋 历史记录</h2>
+    <div id="historyList"></div>
+  </div>
+
   <p style="text-align:center;font-size:.75rem;color:#94A3B8;margin:16px 0">
     电子狗牌 © 2026
   </p>
@@ -77,6 +88,56 @@ const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
 let g_device = null;
 let g_cmdChar = null;
 
+const STORAGE_KEY = 'dogtag_owners';
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveHistory(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function addHistory(name, phone) {
+  let list = getHistory();
+  list = list.filter(h => !(h.name === name && h.phone === phone));
+  list.unshift({ name, phone, time: Date.now() });
+  if (list.length > 10) list = list.slice(0, 10);
+  saveHistory(list);
+  renderHistory();
+}
+
+function removeHistory(idx) {
+  let list = getHistory();
+  list.splice(idx, 1);
+  saveHistory(list);
+  renderHistory();
+}
+
+function selectHistory(name, phone) {
+  document.getElementById('name').value = name;
+  document.getElementById('phone').value = phone;
+}
+
+function renderHistory() {
+  const list = getHistory();
+  const el = document.getElementById('historyList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">暂无记录</div>';
+    return;
+  }
+  el.innerHTML = list.map((h, i) => `
+    <div class="history-item" onclick="selectHistory('${h.name.replace(/'/g,"\\'")}','${h.phone.replace(/'/g,"\\'")}')">
+      <div class="info">
+        <div class="name">${h.name}</div>
+        <div class="phone">${h.phone}</div>
+      </div>
+      <button class="btn-del" onclick="event.stopPropagation();removeHistory(${i})">删除</button>
+    </div>
+  `).join('');
+}
+
 function show(text, type='info') {
   const el = document.getElementById('status');
   el.textContent = text;
@@ -84,10 +145,6 @@ function show(text, type='info') {
   el.style.opacity = 1;
   clearTimeout(el._t);
   el._t = setTimeout(() => { el.style.opacity = 0; }, 5000);
-}
-
-function setStatus(text) {
-  document.getElementById('status').textContent = text;
 }
 
 function disconnect() {
@@ -101,6 +158,8 @@ function onDisconnected() {
   g_device = null;
   g_cmdChar = null;
   document.getElementById('btn').disabled = false;
+  document.getElementById('btn').textContent = '开始配对';
+  document.getElementById('btn').style.background = '#0D9488';
   document.getElementById('infoCard').style.display = 'none';
   show('连接已断开', 'info');
 }
@@ -126,29 +185,31 @@ async function pair() {
   btn.textContent = '连接中...';
 
   try {
-    setStatus('搜索设备...');
+    show('搜索设备...', 'info');
     g_device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'DogTag' }],
       optionalServices: [SVC_UUID]
     });
     g_device.addEventListener('gattserverdisconnected', onDisconnected);
 
-    setStatus('连接 GATT...');
+    show('连接 GATT...', 'info');
     const server = await g_device.gatt.connect();
 
-    setStatus('获取服务...');
+    show('获取服务...', 'info');
     const service = await server.getPrimaryService(SVC_UUID);
 
-    setStatus('写入信息...');
+    show('写入信息...', 'info');
     const nameChar = await service.getCharacteristic(NAME_UUID);
     await nameChar.writeValue(new TextEncoder().encode(name));
 
     const phoneChar = await service.getCharacteristic(PHONE_UUID);
     await phoneChar.writeValue(new TextEncoder().encode(phone));
 
-    setStatus('配对完成...');
+    show('配对完成...', 'info');
     g_cmdChar = await service.getCharacteristic(CMD_UUID);
     await g_cmdChar.writeValue(new Uint8Array([0x01]));
+
+    addHistory(name, phone);
 
     document.getElementById('vName').textContent = name;
     document.getElementById('vPhone').textContent = phone;
@@ -159,16 +220,14 @@ async function pair() {
   } catch (e) {
     if (e.name !== 'NotFoundError') {
       show('配对失败: ' + e.message, 'err');
-      btn.textContent = '开始配对';
-      btn.style.background = '#0D9488';
-      btn.disabled = false;
-    } else {
-      btn.textContent = '开始配对';
-      btn.style.background = '#0D9488';
-      btn.disabled = false;
     }
+    btn.textContent = '开始配对';
+    btn.style.background = '#0D9488';
+    btn.disabled = false;
   }
 }
+
+renderHistory();
 </script>
 </body>
 </html>
