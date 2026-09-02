@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电子狗牌配对</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #F8FAFC; color: #1E293B; }
+.hd { background: #0D9488; color: #fff; padding: 20px; text-align: center; }
+.hd h1 { font-size: 1.4rem; }
+.hd p { font-size: .8rem; opacity: .8; margin-top: 4px; }
+.ct { max-width: 480px; margin: 0 auto; padding: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.card h2 { font-size: 1rem; color: #0D9488; margin-bottom: 12px; text-align: center; }
+label { display: block; font-size: .85rem; color: #64748B; margin: 8px 0 4px; text-align: center; }
+input { width: 100%; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: .9rem; margin-bottom: 8px; text-align: center; }
+input:focus { outline: none; border-color: #0D9488; }
+button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #0D9488; color: #fff; font-size: .95rem; cursor: pointer; margin: 8px 0; }
+button:active { background: #0F766E; }
+button:disabled { background: #94A3B8; cursor: not-allowed; }
+.btn-find { background: #10B981; }
+.btn-find:active { background: #059669; }
+.btn-disc { background: #64748B; }
+.btn-disc:active { background: #475569; }
+.btn-del { background: #EF4444; padding: 6px 12px; font-size: .75rem; width: auto; }
+.btn-del:active { background: #DC2626; }
+#status { text-align: center; padding: 8px; color: #0D9488; font-size: .85rem; }
+.paw { font-size: 2rem; text-align: center; margin: 8px; }
+.info { text-align: center; padding: 12px; background: #F0FDFA; border-radius: 8px; margin: 8px 0; }
+.info p { font-size: .85rem; color: #64748B; margin: 4px 0; }
+.info .val { font-size: 1.1rem; color: #1E293B; font-weight: bold; }
+.history-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px; margin: 6px 0; cursor: pointer; transition: .15s; }
+.history-item:hover { border-color: #0D9488; background: #F0FDFA; }
+.history-item .info { flex: 1; text-align: left; background: none; padding: 0; margin: 0; border-radius: 0; }
+.history-item .info p { margin: 0; }
+.history-item .info .name { font-size: .95rem; color: #1E293B; font-weight: bold; }
+.history-item .info .phone { font-size: .8rem; color: #64748B; }
+.empty { text-align: center; color: #94A3B8; font-size: .85rem; padding: 16px; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <div class="paw">🐾</div>
+  <h1>电子狗牌</h1>
+  <p>智能防走失 · BLE 配对</p>
+</div>
+<div class="ct">
+  <div id="status"></div>
+
+  <div class="card">
+    <h2>🐶 主人信息</h2>
+    <label>主人姓名</label>
+    <input id="name" type="text" maxlength="30" placeholder="请输入姓名">
+    <label>联系电话</label>
+    <input id="phone" type="tel" maxlength="19" placeholder="请输入电话号码">
+    <button id="btn" onclick="pair()">开始配对</button>
+  </div>
+
+  <div class="card" id="infoCard" style="display:none">
+    <h2>✅ 已连接</h2>
+    <div class="info">
+      <p>姓名</p>
+      <div class="val" id="vName">-</div>
+      <p>电话</p>
+      <div class="val" id="vPhone">-</div>
+    </div>
+    <button class="btn-find" onclick="findDevice()">查找设备</button>
+    <button class="btn-disc" onclick="disconnect()">断开连接</button>
+  </div>
+
+  <div class="card" id="historyCard">
+    <h2>📋 历史记录</h2>
+    <div id="historyList"></div>
+  </div>
+
+  <p style="text-align:center;font-size:.75rem;color:#94A3B8;margin:16px 0">
+    电子狗牌 © 2026
+  </p>
+</div>
+
+<script>
+const SVC_UUID  = 'f0debc9a-7856-3412-1234-567812345678';
+const NAME_UUID = 'f1debc9a-7856-3412-1234-567812345678';
+const PHONE_UUID= 'f2debc9a-7856-3412-1234-567812345678';
+const CMD_UUID  = 'f4debc9a-7856-3412-1234-567812345678';
+
+let g_device = null;
+let g_cmdChar = null;
+
+const STORAGE_KEY = 'dogtag_owners';
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveHistory(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function addHistory(name, phone) {
+  let list = getHistory();
+  list = list.filter(h => !(h.name === name && h.phone === phone));
+  list.unshift({ name, phone, time: Date.now() });
+  if (list.length > 10) list = list.slice(0, 10);
+  saveHistory(list);
+  renderHistory();
+}
+
+function removeHistory(idx) {
+  let list = getHistory();
+  list.splice(idx, 1);
+  saveHistory(list);
+  renderHistory();
+}
+
+function selectHistory(name, phone) {
+  document.getElementById('name').value = name;
+  document.getElementById('phone').value = phone;
+}
+
+function renderHistory() {
+  const list = getHistory();
+  const el = document.getElementById('historyList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">暂无记录</div>';
+    return;
+  }
+  el.innerHTML = list.map((h, i) => `
+    <div class="history-item" onclick="selectHistory('${h.name.replace(/'/g,"\\'")}','${h.phone.replace(/'/g,"\\'")}')">
+      <div class="info">
+        <div class="name">${h.name}</div>
+        <div class="phone">${h.phone}</div>
+      </div>
+      <button class="btn-del" onclick="event.stopPropagation();removeHistory(${i})">删除</button>
+    </div>
+  `).join('');
+}
+
+function show(text, type='info') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.style.color = type === 'ok' ? '#10B981' : type === 'err' ? '#EF4444' : '#0D9488';
+  el.style.opacity = 1;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = 0; }, 5000);
+}
+
+function disconnect() {
+  if (g_device && g_device.gatt.connected) {
+    g_device.gatt.disconnect();
+  }
+  onDisconnected();
+}
+
+function onDisconnected() {
+  g_device = null;
+  g_cmdChar = null;
+  document.getElementById('btn').disabled = false;
+  document.getElementById('btn').textContent = '开始配对';
+  document.getElementById('btn').style.background = '#0D9488';
+  document.getElementById('infoCard').style.display = 'none';
+  show('连接已断开', 'info');
+}
+
+async function findDevice() {
+  if (!g_cmdChar) { show('未连接', 'err'); return; }
+  try {
+    await g_cmdChar.writeValue(new Uint8Array([0x02]));
+    show('已发送查找指令', 'ok');
+  } catch (e) {
+    show('发送失败: ' + e.message, 'err');
+  }
+}
+
+async function pair() {
+  const name = document.getElementById('name').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  if (!name || !phone) { show('请填写姓名和电话', 'err'); return; }
+  if (!navigator.bluetooth) { show('浏览器不支持 Web Bluetooth（请用 Chrome）', 'err'); return; }
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  btn.textContent = '连接中...';
+
+  try {
+    show('搜索设备...', 'info');
+    g_device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'DogTag' }],
+      optionalServices: [SVC_UUID]
+    });
+    g_device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    show('连接 GATT...', 'info');
+    const server = await g_device.gatt.connect();
+
+    show('获取服务...', 'info');
+    const service = await server.getPrimaryService(SVC_UUID);
+
+    show('写入信息...', 'info');
+    const nameChar = await service.getCharacteristic(NAME_UUID);
+    await nameChar.writeValue(new TextEncoder().encode(name));
+
+    const phoneChar = await service.getCharacteristic(PHONE_UUID);
+    await phoneChar.writeValue(new TextEncoder().encode(phone));
+
+    show('配对完成...', 'info');
+    g_cmdChar = await service.getCharacteristic(CMD_UUID);
+    await g_cmdChar.writeValue(new Uint8Array([0x01]));
+
+    addHistory(name, phone);
+
+    document.getElementById('vName').textContent = name;
+    document.getElementById('vPhone').textContent = phone;
+    document.getElementById('infoCard').style.display = 'block';
+    btn.textContent = '已配对 ✓';
+    btn.style.background = '#10B981';
+    show('配对成功！保持连接中...', 'ok');
+  } catch (e) {
+    if (e.name !== 'NotFoundError') {
+      show('配对失败: ' + e.message, 'err');
+    }
+    btn.textContent = '开始配对';
+    btn.style.background = '#0D9488';
+    btn.disabled = false;
+  }
+}
+
+renderHistory();
+</script>
+</body>
+</html>
