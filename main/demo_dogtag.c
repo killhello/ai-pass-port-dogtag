@@ -93,12 +93,6 @@ void demo_dogtag_key(bsp_btn_t btn, bsp_btn_ev_t ev) {
         dogtag_ui_enter_silent();
     }
     if (btn == BSP_BTN_UP && (state == DOGTAG_STATE_MILD_LOST || state == DOGTAG_STATE_SEVERE_LOST)) {
-        if (dogtag_ui_lock()) {
-            lv_obj_t *mascot = dogtag_ui_get_mascot();
-            extern void ui_pixel_mascot_jump(lv_obj_t *);
-            ui_pixel_mascot_jump(mascot);
-            dogtag_ui_unlock();
-        }
         dogtag_audio_play_help(90);
     }
 }

@@ -17,11 +17,10 @@ void dogtag_ui_update_flash(bool flash_on);
 void dogtag_ui_update_battery(int soc);
 void dogtag_ui_update_rssi(int8_t rssi);
 void dogtag_ui_update_countdown(int seconds);
+void dogtag_ui_update_time(const char *time_str);
 
 bool dogtag_ui_lock(void);
 void dogtag_ui_unlock(void);
-
-lv_obj_t *dogtag_ui_get_mascot(void);
 
 #ifdef __cplusplus
 }

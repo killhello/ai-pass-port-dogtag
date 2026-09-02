@@ -10,7 +10,7 @@ static lv_obj_t *block(lv_obj_t *parent, int x, int y, int w, int h, uint32_t co
     lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_pos(obj, x, y);
     lv_obj_set_size(obj, w, h);
-    lv_obj_set_style_radius(obj, 0, 0);
+    lv_obj_set_style_radius(obj, 12, 0);
     lv_obj_set_style_border_width(obj, 0, 0);
     lv_obj_set_style_pad_all(obj, 0, 0);
     lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
@@ -67,6 +67,7 @@ lv_obj_t *ui_pixel_panel_create(lv_obj_t *parent, int x, int y, int w, int h,
     lv_obj_t *panel = block(parent, x, y, w, h, color);
     lv_obj_set_style_border_color(panel, lv_color_hex(UI_INK), 0);
     lv_obj_set_style_border_width(panel, 4, 0);
+    lv_obj_set_style_radius(panel, 12, 0);
     lv_obj_set_style_pad_all(panel, 7, 0);
     return panel;
 }
