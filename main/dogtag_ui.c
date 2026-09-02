@@ -76,19 +76,23 @@ void dogtag_ui_enter_silent(void) {
     s_lbl_rssi = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_rssi, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_rssi, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_rssi, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_obj_align(s_lbl_rssi, LV_ALIGN_TOP_MID, 0, 26);
     lv_label_set_text(s_lbl_rssi, "0");
 
     s_lbl_name = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_LEFT, 6, 50);
+    lv_obj_set_width(s_lbl_name, 190);
+    lv_obj_set_style_text_align(s_lbl_name, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 50);
     lv_label_set_text_fmt(s_lbl_name, "%s", dogtag_state_get_owner_name());
 
     s_lbl_phone = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_LEFT, 6, 74);
+    lv_obj_set_width(s_lbl_phone, 190);
+    lv_obj_set_style_text_align(s_lbl_phone, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 74);
     lv_label_set_text_fmt(s_lbl_phone, "%s", dogtag_state_get_owner_phone());
 
     s_mascot = ui_pixel_mascot_create(s_scr, 101, 244);
@@ -111,23 +115,27 @@ void dogtag_ui_enter_lost(void) {
     s_lbl_soc = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_soc, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_soc, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_LEFT, 6, 26);
+    lv_obj_align(s_lbl_soc, LV_ALIGN_TOP_MID, 0, 26);
 
     s_lbl_cd = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_cd, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_cd, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_cd, LV_ALIGN_TOP_LEFT, 6, 46);
+    lv_obj_align(s_lbl_cd, LV_ALIGN_TOP_MID, 0, 46);
 
     s_lbl_name = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_name, &font_cn_16, 0);
     lv_obj_set_style_text_color(s_lbl_name, lv_color_hex(UI_INK), 0);
-    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_LEFT, 6, 70);
+    lv_obj_set_width(s_lbl_name, 190);
+    lv_obj_set_style_text_align(s_lbl_name, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(s_lbl_name, LV_ALIGN_TOP_MID, 0, 70);
     lv_label_set_text_fmt(s_lbl_name, "姓名: %s", dogtag_state_get_owner_name());
 
     s_lbl_phone = lv_label_create(s_panel);
     lv_obj_set_style_text_font(s_lbl_phone, &font_cn_20, 0);
     lv_obj_set_style_text_color(s_lbl_phone, lv_color_hex(UI_RED), 0);
-    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_LEFT, 6, 94);
+    lv_obj_set_width(s_lbl_phone, 190);
+    lv_obj_set_style_text_align(s_lbl_phone, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(s_lbl_phone, LV_ALIGN_TOP_MID, 0, 94);
     lv_label_set_text_fmt(s_lbl_phone, "电话: %s", dogtag_state_get_owner_phone());
 
     s_lbl_sos = lv_label_create(s_panel);

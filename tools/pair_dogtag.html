@@ -1,46 +1,71 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>电子狗牌配对</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-.card { background: #16213e; border-radius: 16px; padding: 32px; width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
-h1 { text-align: center; font-size: 24px; margin-bottom: 8px; }
-.sub { text-align: center; color: #888; font-size: 14px; margin-bottom: 24px; }
-label { display: block; font-size: 14px; color: #aaa; margin-bottom: 4px; }
-input { width: 100%; padding: 12px; border: 1px solid #333; border-radius: 8px; background: #0f3460; color: #fff; font-size: 16px; margin-bottom: 16px; outline: none; }
-input:focus { border-color: #e94560; }
-button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: .2s; }
-.btn-pair { background: #e94560; color: #fff; }
-.btn-pair:hover { background: #c73a52; }
-.btn-pair:disabled { background: #555; cursor: not-allowed; }
-.btn-find { background: #27ae60; color: #fff; margin-top: 12px; display: none; }
-.btn-find:hover { background: #1e8449; }
-.btn-disconnect { background: #555; color: #fff; margin-top: 12px; display: none; }
-.btn-disconnect:hover { background: #333; }
-.msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
-.msg.ok { display: block; background: #1b4332; color: #95d5b2; }
-.msg.err { display: block; background: #3d0814; color: #ff6b6b; }
-.msg.info { display: block; background: #0a1628; color: #5dade2; }
-#status { margin-top: 16px; text-align: center; color: #666; font-size: 13px; }
+body { font-family: -apple-system, sans-serif; background: #F8FAFC; color: #1E293B; }
+.hd { background: #0D9488; color: #fff; padding: 20px; text-align: center; }
+.hd h1 { font-size: 1.4rem; }
+.hd p { font-size: .8rem; opacity: .8; margin-top: 4px; }
+.ct { max-width: 480px; margin: 0 auto; padding: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.card h2 { font-size: 1rem; color: #0D9488; margin-bottom: 12px; text-align: center; }
+label { display: block; font-size: .85rem; color: #64748B; margin: 8px 0 4px; text-align: center; }
+input { width: 100%; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: .9rem; margin-bottom: 8px; text-align: center; }
+input:focus { outline: none; border-color: #0D9488; }
+button { width: 100%; padding: 12px; border: none; border-radius: 8px; background: #0D9488; color: #fff; font-size: .95rem; cursor: pointer; margin: 8px 0; }
+button:active { background: #0F766E; }
+button:disabled { background: #94A3B8; cursor: not-allowed; }
+.btn-find { background: #10B981; }
+.btn-find:active { background: #059669; }
+.btn-disc { background: #64748B; }
+.btn-disc:active { background: #475569; }
+.btn-exit { background: #EF4444; }
+.btn-exit:active { background: #DC2626; }
+#status { text-align: center; padding: 8px; color: #0D9488; font-size: .85rem; }
+.paw { font-size: 2rem; text-align: center; margin: 8px; }
+.info { text-align: center; padding: 12px; background: #F0FDFA; border-radius: 8px; margin: 8px 0; }
+.info p { font-size: .85rem; color: #64748B; margin: 4px 0; }
+.info .val { font-size: 1.1rem; color: #1E293B; font-weight: bold; }
 </style>
 </head>
 <body>
-<div class="card">
+<div class="hd">
+  <div class="paw">🐾</div>
   <h1>电子狗牌</h1>
-  <p class="sub">BLE 配对工具</p>
-  <label>主人姓名</label>
-  <input type="text" id="name" placeholder="请输入姓名">
-  <label>联系电话</label>
-  <input type="tel" id="phone" placeholder="请输入电话号码">
-  <button class="btn-pair" id="btn" onclick="pair()">开始配对</button>
-  <button class="btn-find" id="btnFind" onclick="findDevice()">查找设备</button>
-  <button class="btn-disconnect" id="btnDisc" onclick="disconnect()">断开连接</button>
-  <div class="msg" id="msg"></div>
-  <p id="status"></p>
+  <p>智能防走失 · BLE 配对</p>
+</div>
+<div class="ct">
+  <div id="status"></div>
+
+  <div class="card">
+    <h2>🐶 主人信息</h2>
+    <label>主人姓名</label>
+    <input id="name" type="text" maxlength="30" placeholder="请输入姓名">
+    <label>联系电话</label>
+    <input id="phone" type="tel" maxlength="19" placeholder="请输入电话号码">
+    <button id="btn" onclick="pair()">开始配对</button>
+  </div>
+
+  <div class="card" id="infoCard" style="display:none">
+    <h2>✅ 已连接</h2>
+    <div class="info">
+      <p>姓名</p>
+      <div class="val" id="vName">-</div>
+      <p>电话</p>
+      <div class="val" id="vPhone">-</div>
+    </div>
+    <button class="btn-find" onclick="findDevice()">查找设备</button>
+    <button class="btn-disc" onclick="disconnect()">断开连接</button>
+  </div>
+
+  <button class="btn-exit" onclick="location.reload()" style="margin-top:16px">重新配对</button>
+  <p style="text-align:center;font-size:.75rem;color:#94A3B8;margin:16px 0">
+    电子狗牌 © 2026
+  </p>
 </div>
 
 <script>
@@ -53,9 +78,12 @@ let g_device = null;
 let g_cmdChar = null;
 
 function show(text, type='info') {
-  const el = document.getElementById('msg');
-  el.innerHTML = text;
-  el.className = 'msg ' + type;
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.style.color = type === 'ok' ? '#10B981' : type === 'err' ? '#EF4444' : '#0D9488';
+  el.style.opacity = 1;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = 0; }, 5000);
 }
 
 function setStatus(text) {
@@ -73,9 +101,7 @@ function onDisconnected() {
   g_device = null;
   g_cmdChar = null;
   document.getElementById('btn').disabled = false;
-  document.getElementById('btnFind').style.display = 'none';
-  document.getElementById('btnDisc').style.display = 'none';
-  setStatus('已断开');
+  document.getElementById('infoCard').style.display = 'none';
   show('连接已断开', 'info');
 }
 
@@ -97,48 +123,50 @@ async function pair() {
 
   const btn = document.getElementById('btn');
   btn.disabled = true;
+  btn.textContent = '连接中...';
 
   try {
-    setStatus('步骤 1/5：搜索设备');
-    show('正在搜索 DogTag 设备...', 'info');
+    setStatus('搜索设备...');
     g_device = await navigator.bluetooth.requestDevice({
       filters: [{ namePrefix: 'DogTag' }],
       optionalServices: [SVC_UUID]
     });
-
     g_device.addEventListener('gattserverdisconnected', onDisconnected);
 
-    setStatus('步骤 2/5：连接 GATT');
-    show('正在连接...', 'info');
+    setStatus('连接 GATT...');
     const server = await g_device.gatt.connect();
 
-    setStatus('步骤 3/5：获取服务');
+    setStatus('获取服务...');
     const service = await server.getPrimaryService(SVC_UUID);
 
-    setStatus('步骤 4/5：写入信息');
-    show('正在写入信息...', 'info');
+    setStatus('写入信息...');
     const nameChar = await service.getCharacteristic(NAME_UUID);
     await nameChar.writeValue(new TextEncoder().encode(name));
 
     const phoneChar = await service.getCharacteristic(PHONE_UUID);
     await phoneChar.writeValue(new TextEncoder().encode(phone));
 
-    setStatus('步骤 5/5：发送配对完成指令');
+    setStatus('配对完成...');
     g_cmdChar = await service.getCharacteristic(CMD_UUID);
     await g_cmdChar.writeValue(new Uint8Array([0x01]));
 
-    setStatus('已连接');
-    show(`配对成功！保持连接中...<br>姓名：${name}<br>电话：${phone}<br><small>点击"查找设备"让狗牌响铃</small>`, 'ok');
-    document.getElementById('btnFind').style.display = 'block';
-    document.getElementById('btnDisc').style.display = 'block';
+    document.getElementById('vName').textContent = name;
+    document.getElementById('vPhone').textContent = phone;
+    document.getElementById('infoCard').style.display = 'block';
+    btn.textContent = '已配对 ✓';
+    btn.style.background = '#10B981';
+    show('配对成功！保持连接中...', 'ok');
   } catch (e) {
     if (e.name !== 'NotFoundError') {
-      show('配对失败: ' + e.message + '<br><small>' + (e.name || '') + '</small>', 'err');
-      setStatus('失败');
+      show('配对失败: ' + e.message, 'err');
+      btn.textContent = '开始配对';
+      btn.style.background = '#0D9488';
+      btn.disabled = false;
     } else {
-      setStatus('已取消');
+      btn.textContent = '开始配对';
+      btn.style.background = '#0D9488';
+      btn.disabled = false;
     }
-    btn.disabled = false;
   }
 }
 </script>
