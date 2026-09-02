@@ -1,0 +1,17 @@
+#!/bin/bash
+# Gradle wrapper script
+
+GRADLE_VERSION="8.2"
+GRADLE_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+GRADLE_DIR="$HOME/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
+
+if [ ! -d "$GRADLE_DIR" ]; then
+    mkdir -p "$GRADLE_DIR"
+    cd "$GRADLE_DIR"
+    curl -sL "$GRADLE_URL" -o gradle.zip
+    unzip -q gradle.zip
+    rm gradle.zip
+fi
+
+GRADLE_BIN=$(find "$GRADLE_DIR" -name "gradle" -type f | head -1)
+exec "$GRADLE_BIN" "$@"
