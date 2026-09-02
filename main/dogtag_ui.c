@@ -5,8 +5,7 @@
 
 #include "esp_log.h"
 #include "lvgl.h"
-#include "driver/soc.h"
-#include "esp_timer.h"
+#include <sys/time.h>
 
 extern const lv_font_t font_cn_16;
 extern const lv_font_t font_cn_20;
